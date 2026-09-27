@@ -1,0 +1,2096 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>げんそラボ（試作）</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F6FAFD; --grid:rgba(60,120,180,.12); --ink:#1F2A44; --muted:#5A6B85;
+  --panel:#FFFFFF; --line:#D5E2EE; --accent:#2F6FDE; --dim:.22;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#121A2B; --grid:rgba(140,180,230,.08); --ink:#E6EDF7; --muted:#9AA9C2;
+    --panel:#1B2539; --line:#2C3A55; --accent:#7FB2FF; --dim:.25;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#121A2B; --grid:rgba(140,180,230,.08); --ink:#E6EDF7; --muted:#9AA9C2;
+  --panel:#1B2539; --line:#2C3A55; --accent:#7FB2FF; --dim:.25;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{
+  margin:0; color:var(--ink); background-color:var(--bg);
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:20px 20px;
+  font-family:"M PLUS Rounded 1c","Hiragino Maru Gothic ProN","Hiragino Sans","Yu Gothic",system-ui,sans-serif;
+  font-weight:500; line-height:1.7;
+}
+main{max-width:760px; margin:0 auto; padding:20px 14px 40px}
+h1{font-size:1.6rem; font-weight:800; margin:4px 0 2px; letter-spacing:.02em}
+.lead{color:var(--muted); margin:0 0 16px; font-size:.92rem}
+.tablewrap{overflow-x:auto; padding-bottom:6px}
+.ptable{
+  display:grid; grid-template-columns:16px repeat(18,minmax(36px,1fr));
+  gap:3px; min-width:720px;
+}
+.ghead{
+  font:inherit; font-size:.66rem; font-weight:800; color:var(--muted); white-space:nowrap;
+  background:none; border:1.5px solid var(--line); border-radius:8px;
+  padding:3px 0; cursor:pointer; text-align:center;
+}
+.ghead[aria-pressed="true"]{color:var(--panel); background:var(--accent); border-color:var(--accent)}
+.plabel{position:sticky; left:0; z-index:1; background:var(--bg); font-size:.7rem; color:var(--muted); display:flex; align-items:center; justify-content:center; font-weight:800}
+.corner{visibility:hidden}
+.cell{
+  font:inherit; color:inherit; position:relative; background:var(--panel);
+  border:1.5px solid var(--line); border-radius:10px; padding:2px 0 3px;
+  cursor:pointer; display:flex; flex-direction:column; align-items:center;
+  transition:opacity .2s;
+}
+.cell:hover{border-color:var(--accent)}
+.cell:focus-visible,.ghead:focus-visible,.close:focus-visible{outline:3px solid var(--accent); outline-offset:2px}
+.cell svg{width:100%; max-width:52px; height:auto; display:block}
+.cell .sym{font-weight:800; font-size:.82rem; line-height:1.1}
+.cell .num{position:absolute; top:1px; left:4px; font-size:.55rem; color:var(--muted)}
+.empty{}
+.cell.secret{background:transparent; border-style:dashed}
+.flabel{grid-column:span 2; font-size:.62rem; font-weight:800; color:var(--muted); display:flex; align-items:center; justify-content:center; text-align:center; line-height:1.2}
+.cell.secret svg{color:var(--ink); opacity:.22}
+.cell.secret .sym{color:var(--muted)}
+.hint{font-size:.78rem; color:var(--muted); margin:4px 0 0}
+.ptable.filtered .cell:not(.hit){opacity:var(--dim)}
+.caption{
+  min-height:3.2em; margin:12px 0 0; padding:10px 12px; border-radius:12px;
+  background:var(--panel); border:1.5px solid var(--line); font-size:.9rem;
+}
+.caption b{font-weight:800}
+.rules{margin-top:22px}
+.rules h2{font-size:1.05rem; font-weight:800; margin:0 0 8px}
+.rules dl{display:grid; grid-template-columns:auto 1fr; gap:4px 14px; margin:0; font-size:.9rem}
+.rules dt{font-weight:800}
+.rules dd{margin:0; color:var(--muted)}
+.pop{animation:pop .35s cubic-bezier(.3,1.6,.5,1) both}
+@keyframes pop{from{transform:scale(.2);opacity:0}to{transform:scale(1);opacity:1}}
+/* detail sheet */
+.backdrop{position:fixed; inset:0; background:rgba(10,18,35,.45); display:none; z-index:10}
+.backdrop.open{display:block}
+.sheet{
+  position:fixed; left:0; right:0; bottom:0; z-index:11; max-height:88%;
+  overflow-y:auto; background:var(--panel); border-radius:20px 20px 0 0;
+  padding:16px 18px calc(22px + env(safe-area-inset-bottom,0px));
+  transform:translateY(105%); transition:transform .28s ease;
+  max-width:620px; margin:0 auto; border:1.5px solid var(--line);
+}
+.sheet:not(.open){visibility:hidden; transition:transform .28s ease, visibility 0s .28s}
+.sheet.open{transform:translateY(0)}
+.sheet-top{display:flex; gap:14px; align-items:center}
+.big{width:150px; flex:0 0 150px}
+.big svg{width:100%; height:auto; display:block}
+.bob{animation:bob 2.4s ease-in-out infinite}
+@keyframes bob{50%{transform:translateY(-4px)}}
+.name{font-size:1.5rem; font-weight:800; line-height:1.2}
+.name small{font-size:.95rem; color:var(--muted); font-weight:500; margin-left:6px}
+.meta{color:var(--muted); font-size:.85rem; margin-top:4px}
+.why{margin:14px 0 0; display:grid; grid-template-columns:auto 1fr; gap:8px 12px; font-size:.92rem}
+.why dt{font-weight:800; white-space:nowrap}
+.why dd{margin:0}
+.sheet h3{font-size:1rem; margin:16px 0 0; font-weight:800}
+.close{
+  font:inherit; font-weight:800; margin-top:16px; width:100%; padding:10px;
+  border-radius:12px; border:1.5px solid var(--line); background:var(--bg); color:var(--ink); cursor:pointer;
+}
+[hidden]{display:none!important}
+.kstats{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px}
+.kstats span{font-size:.82rem; font-weight:800; padding:3px 10px; border-radius:999px; background:var(--panel); border:1.5px solid var(--line)}
+.kcard{padding:14px; border-radius:16px; background:var(--panel); border:2px solid var(--accent)}
+.kbadge{display:inline-block; font-size:.75rem; font-weight:800; padding:1px 10px; border-radius:999px; background:var(--accent); color:var(--panel)}
+.kbadge.rev{background:#FF6B4A}
+.kq{display:flex; gap:12px; align-items:center; margin:8px 0}
+.kq svg{width:72px; height:72px; flex:0 0 72px}
+.kq .big{font-size:1.25rem; font-weight:800}
+.kslots{display:flex; gap:8px; margin:8px 0}
+.kslot{width:52px; height:56px; border-radius:12px; border:2px dashed var(--line); display:flex; align-items:center; justify-content:center; font-size:1.6rem; font-weight:800; background:var(--bg); cursor:pointer}
+.ktiles{display:flex; gap:8px; flex-wrap:wrap; margin:8px 0}
+.ktile{font:inherit; font-size:1.4rem; font-weight:800; width:48px; height:52px; border-radius:12px; border:1.5px solid var(--line); background:var(--bg); color:var(--ink); cursor:pointer}
+.ktile:disabled{opacity:.25}
+.kin{font:inherit; font-size:1.2rem; font-weight:800; padding:8px 12px; border-radius:10px; border:1.5px solid var(--line); background:var(--bg); color:var(--ink); width:9em}
+.kres{margin-top:10px; padding:10px 12px; border-radius:12px; font-size:.92rem}
+.kres.ok{background:color-mix(in srgb,#34A36A 16%,var(--panel)); border:1.5px solid #34A36A}
+.kres.ng{background:color-mix(in srgb,#FF6B4A 12%,var(--panel)); border:1.5px solid #FF6B4A}
+.kmap{display:grid; grid-template-columns:repeat(auto-fill,minmax(44px,1fr)); gap:4px; margin-top:14px}
+.kmap div{font-size:.8rem; font-weight:800; text-align:center; padding:5px 0; border-radius:8px; border:1.5px solid var(--line); background:var(--panel)}
+.kmap .kz{font-weight:500; color:var(--muted); font-size:.75rem}
+.kmap .l1{background:color-mix(in srgb,#34A36A 15%,var(--panel))}
+.kmap .l2{background:color-mix(in srgb,#34A36A 35%,var(--panel))}
+.kmap .l3{background:#34A36A; color:#fff; border-color:#34A36A}
+.kmap .rv{border-color:#FF6B4A; border-style:dashed}
+.parentlink{margin-top:32px; text-align:center}
+.parentlink .btn{font-size:.78rem; color:var(--muted)}
+.overlay{position:fixed; inset:0; z-index:30; background:rgba(10,18,35,.62); display:flex; align-items:center; justify-content:center; padding:16px}
+.ovbox{background:var(--panel); color:var(--ink); border-radius:16px; padding:16px 18px; width:100%; max-width:440px; max-height:90%; overflow:auto}
+.ovbox h2{margin:0 0 8px; font-size:1.2rem; font-weight:800}
+.ovbox h3{margin:14px 0 6px; font-size:.95rem; font-weight:800}
+.ovbox select{font:inherit; padding:6px 8px; border-radius:8px; border:1.5px solid var(--line); background:var(--bg); color:var(--ink)}
+.ovbox table{width:100%; border-collapse:collapse; font-size:.86rem}
+.ovbox td{padding:4px 6px; border-bottom:1px solid var(--line)}
+.pmsg{font-size:.85rem; color:#FF6B4A; min-height:1.2em; margin:6px 0 0}
+.tool{font:inherit; font-weight:800; padding:6px 12px; border-radius:10px; border:1.5px solid var(--line); background:var(--panel); color:var(--ink); cursor:pointer}
+.tool[aria-pressed="true"]{outline:3px solid var(--accent); outline-offset:1px; border-color:var(--accent)}
+.mission{display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:12px; background:var(--panel); border:1.5px solid var(--line); margin-bottom:8px}
+.mission .sw{width:34px; height:34px; border-radius:50%; flex:0 0 34px; border:2px solid var(--ink)}
+.mission b{display:block; font-size:1.02rem}
+.mission span{font-size:.82rem; color:var(--muted)}
+.sky{width:100%; height:260px; display:block; border-radius:14px; background:#0A1030}
+.fchips{display:flex; flex-wrap:wrap; gap:6px; margin:8px 0}
+.fchip{font:inherit; color:inherit; width:56px; padding:2px 0 3px; border-radius:10px; border:1.5px solid var(--line); background:var(--panel); cursor:pointer; display:flex; flex-direction:column; align-items:center}
+.fchip svg{width:40px; height:40px}
+.fchip span{font-weight:800; font-size:.8rem; line-height:1.1}
+.fchip small{font-size:.58rem; color:var(--muted)}
+.fchip[aria-pressed="true"]{border-color:var(--accent); outline:3px solid var(--accent); outline-offset:1px}
+.btn.launch{background:var(--accent); color:var(--panel); border-color:var(--accent); padding:9px 22px}
+.fx{margin-top:10px; padding:12px 14px; border-radius:14px; background:var(--panel); border:1.5px solid var(--line)}
+.fx h3{margin:0 0 4px; font-size:1.05rem; font-weight:800}
+.fx p{margin:6px 0; font-size:.9rem}
+.fx svg{display:block; width:100%; height:auto}
+.jump{display:flex; gap:10px; align-items:center}
+.jump svg{width:200px; flex:0 0 200px}
+@media (max-width:420px){.jump{flex-direction:column; align-items:flex-start}.jump svg{width:100%; max-width:260px}}
+.el-e{animation:ejump 2.6s ease-in-out infinite}
+.el-up{animation:eup 2.6s ease-in-out infinite}
+.el-out{animation:eout 2.6s ease-in-out infinite}
+@keyframes eout{0%,10%{transform:translateX(0)}28%,52%{transform:translateX(22px)}62%,100%{transform:translateX(0)}}
+@keyframes eup{0%,10%{transform:translateY(0)}28%,52%{transform:translateY(-62px)}62%,100%{transform:translateY(0)}}
+@keyframes ejump{0%,10%{transform:translateY(0)}28%,52%{transform:translateY(-16px)}62%,100%{transform:translateY(0)}}
+.ph{stroke-dasharray:120; stroke-dashoffset:120; animation:photon 2.6s linear infinite}
+@keyframes photon{0%,60%{stroke-dashoffset:120; opacity:0}64%{opacity:1}100%{stroke-dashoffset:0; opacity:.2}}
+.heat{animation:heat 2.6s linear infinite}
+@keyframes heat{0%{opacity:0}8%,26%{opacity:1}34%,100%{opacity:0}}
+.fx + .coll .slot, #fstages .slot{background:transparent}
+#fstages .slot.made{background:var(--panel)}
+.slot .dot{display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:4px; vertical-align:middle; border:1px solid var(--ink)}
+.hpick{display:flex; gap:4px; overflow-x:auto; padding:2px 2px 8px}
+.hp{flex:0 0 auto; min-width:40px; font:inherit; font-weight:800; font-size:.85rem; padding:4px 6px; border-radius:9px; border:1.5px solid var(--line); background:var(--panel); color:var(--ink); cursor:pointer; line-height:1.15}
+.hp small{display:block; font-size:.6rem; color:var(--muted); font-weight:500}
+.hp.cleared{border-color:#34A36A; background:color-mix(in srgb,#34A36A 14%,var(--panel))}
+.hp[aria-pressed="true"]{outline:3px solid var(--accent); outline-offset:1px}
+.atom{width:100%; max-width:340px; height:auto; display:block; margin:0 auto; background:var(--panel); border:1.5px solid var(--line); border-radius:14px; color:var(--ink); touch-action:manipulation; user-select:none; -webkit-user-select:none}
+.lesson{margin:0 0 14px; padding:14px; border-radius:16px; background:var(--panel); border:2px solid var(--accent)}
+.lesson .step{font-size:.78rem; color:var(--muted); font-weight:800}
+.lesson h2{font-size:1.15rem; font-weight:800; margin:2px 0 6px; line-height:1.4}
+.lesson p{margin:6px 0; font-size:.92rem}
+.lesson svg{width:100%; max-width:340px; height:auto; display:block; margin:6px auto; color:var(--ink)}
+.lesson table{border-collapse:collapse; width:100%; font-size:.84rem; margin:6px 0}
+.lesson th,.lesson td{border:1px solid var(--line); padding:5px 6px; text-align:left; vertical-align:top}
+.lesson th{background:var(--bg)}
+.ruler{display:flex; gap:4px; margin:6px 0}
+.ruler button{font:inherit; font-weight:800; flex:1 1 0; min-width:0; padding:6px 0; border-radius:9px; border:1.5px solid var(--line); background:var(--bg); color:var(--ink); cursor:pointer}
+.ruler button[aria-pressed="true"]{background:var(--accent); color:var(--panel); border-color:var(--accent)}
+.bars{margin:6px 0}
+.bar{display:flex; align-items:center; gap:8px; margin:4px 0; font-size:.85rem}
+.bar i{display:block; height:14px; border-radius:7px}
+.bar.win{font-weight:800}
+.lnav{display:flex; justify-content:space-between; gap:8px; margin-top:10px}
+.qbox{margin-top:8px; padding:10px 12px; border-radius:12px; background:var(--panel); border:1.5px solid var(--line)}
+.qbox .q{font-weight:800; margin-bottom:6px}
+.opt{font:inherit; font-weight:800; min-width:48px; padding:8px 12px; border-radius:10px; border:1.5px solid var(--line); background:var(--bg); color:var(--ink); cursor:pointer}
+.opt.red{border-color:#FF6B4A} .opt.blue{border-color:#3D8BFF} .opt.purple{border-color:#A56BFF}
+.done{display:flex; gap:12px; align-items:center; margin-top:8px; padding:10px 12px; border-radius:14px; background:var(--panel); border:2px solid #34A36A}
+.done svg{width:96px; height:96px; flex:0 0 96px}
+.done p{margin:2px 0; font-size:.9rem}
+.done b{font-size:1.1rem}
+.tabs{display:flex; gap:6px; margin:8px 0 14px; overflow-x:auto; padding:2px}
+.tab{flex:0 0 auto}
+.tab{font:inherit; font-weight:800; padding:6px 14px; border-radius:999px; border:1.5px solid var(--line); background:var(--panel); color:var(--ink); cursor:pointer}
+.tab[aria-selected="true"]{background:var(--accent); border-color:var(--accent); color:var(--panel)}
+.tab:focus-visible,.btn:focus-visible,.pbtn:focus-visible{outline:3px solid var(--accent); outline-offset:2px}
+.bench{width:100%; height:auto; display:block; background:var(--panel); border:1.5px solid var(--line); border-radius:14px; touch-action:none; user-select:none; -webkit-user-select:none; color:var(--ink)}
+#palseg{gap:5px; flex-wrap:nowrap}
+#palseg .tool{font-size:.78rem; padding:5px 8px; white-space:nowrap}
+.palette{display:grid; grid-template-columns:repeat(auto-fill,minmax(48px,1fr)); gap:5px; padding:8px 0 6px}
+.pbtn{min-width:0; font:inherit; color:inherit; background:var(--panel); border:1.5px solid var(--line); border-radius:10px; padding:2px 0 3px; cursor:pointer; display:flex; flex-direction:column; align-items:center}
+.pbtn svg{width:38px; height:38px}
+.pbtn span{font-weight:800; font-size:.8rem; line-height:1.1}
+.palette:has(.part){grid-template-columns:repeat(auto-fill,minmax(64px,1fr))}
+.pbtn.part span{font-size:.72rem}
+.status{font-size:.88rem; min-height:3em; margin:6px 0 8px; padding:8px 12px; border-radius:12px; background:var(--panel); border:1.5px solid var(--line)}
+.status.warn{border-color:#FF6B4A}
+.row{display:flex; gap:8px; flex-wrap:wrap}
+h1 .sub{display:block; font-size:.8rem; font-weight:700; color:var(--muted); margin-top:2px}
+.bk{width:100%; box-sizing:border-box; min-height:5.5em; font:inherit; font-size:.72rem; padding:8px; border-radius:10px; border:1.5px solid var(--line); background:var(--panel); color:var(--ink); word-break:break-all}
+.bknote{font-size:.8rem; margin:0 0 6px}
+.btn{font:inherit; font-weight:800; font-size:.85rem; padding:7px 14px; border-radius:10px; border:1.5px solid var(--line); background:var(--panel); color:var(--ink); cursor:pointer}
+.btn:disabled{opacity:.4; cursor:default}
+.result{margin-top:12px; padding:12px 14px; border-radius:14px; background:var(--panel); border:2px solid var(--accent)}
+.result .rname{font-size:1.35rem; font-weight:800; line-height:1.3}
+.result .rname small{font-size:.95rem; color:var(--muted); font-weight:500; margin-left:6px}
+.result p{margin:6px 0 0; font-size:.9rem}
+.result .kind{display:inline-block; font-size:.78rem; font-weight:800; padding:1px 10px; border-radius:999px; background:var(--bg); border:1.5px solid var(--line); margin-top:4px}
+.balance{width:100%; max-width:320px; height:auto; display:block; margin:8px 0 0}
+.coll h2{font-size:1.05rem; font-weight:800; margin:22px 0 4px}
+.coll .count{font-size:.85rem; color:var(--muted); margin:0 0 8px}
+.cgrid{display:grid; grid-template-columns:repeat(auto-fill,minmax(96px,1fr)); gap:6px}
+.slot{padding:6px 8px; border-radius:10px; border:1.5px dashed var(--line); font-size:.78rem; color:var(--muted)}
+.slot b{display:block; font-size:1rem; color:var(--muted)}
+.slot.made{border-style:solid; background:var(--panel); color:var(--ink)}
+.slot.made b{color:var(--ink)}
+@media (prefers-reduced-motion: reduce){
+  .pop,.bob,.el-e,.el-up,.el-out,.ph,.heat{animation:none}
+  .ph{stroke-dashoffset:0}
+  .sheet{transition:none}
+}
+</style>
+</head>
+<body>
+<main>
+  <h1>げんそラボ <small class="sub">元素の実験ノート（試作）</small></h1>
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" id="tab-zukan" aria-selected="true">図鑑</button>
+    <button class="tab" role="tab" id="tab-kigo" aria-selected="false">記号</button>
+    <button class="tab" role="tab" id="tab-haichi" aria-selected="false">電子配置</button>
+    <button class="tab" role="tab" id="tab-gousei" aria-selected="false">合成</button>
+    <button class="tab" role="tab" id="tab-hanabi" aria-selected="false">花火</button>
+    <button class="tab" role="tab" id="tab-semi" aria-selected="false">半導体</button>
+  </div>
+  <div id="view-zukan">
+  <p class="lead">1〜20番と、中学でよく出る10元素を、データから自動で描いています。キャラをタップすると見た目のひみつ、列の見出しをタップすると同じなかまが光ります。影になっているのはひみつの元素。影をタップしてクイズに正解すると解放されます。</p>
+
+  <div class="tablewrap"><div class="ptable" id="ptable"></div></div>
+  <p class="hint">周期表は横にスクロールできます。3〜12族は第4周期から登場します。八角形は遷移金属です。下の2段は、1マスにまとめて入っているランタノイドとアクチノイドを一つずつならべたものです。</p>
+  <p class="hint" id="unlockCount"></p>
+  <div class="caption" id="caption">列の見出し（1族〜18族）をタップしてみてください。</div>
+
+  <section class="rules">
+    <h2>見た目のルール</h2>
+    <dl>
+      <dt>体の形</dt><dd>族（周期表の縦の列）で決まる。同じ列はみんな同じ形</dd>
+      <dt>手の数</dt><dd>ほかの原子とつなぐ手。外側の電子が満杯になるまでの数で決まる</dd>
+      <dt>手の色</dt><dd>赤い＋の手は電子を手放したい側、青い−の手は受け取りたい側。紫の±の手は、手放す数と受け取る数が同じでどちらとも言えない（炭素・ケイ素・水素）</dd>
+      <dt>大きさ</dt><dd>周期（横の段）。下の段ほど電子の部屋が多くて大きい</dd>
+      <dt>色</dt><dd>炎色反応がある元素はその炎の色。ほかは金属・半金属・非金属・希ガスで色分け</dd>
+    </dl>
+  </section>
+  </div>
+
+  <div id="view-haichi" hidden>
+    <p class="lead">まずルール編で「手放す・受け取る・共有する」の決まり方を学んでから、原子核のまわりの部屋（殻）に電子を入れよう。入れ終わったら、満杯にする方法と手の数を当てるとキャラが完成します。</p>
+    <div id="hintro"></div>
+    <div class="hpick" id="hpick" aria-label="元素をえらぶ"></div>
+    <svg class="atom" id="hatom" viewBox="0 0 320 320" aria-label="電子配置の図"></svg>
+    <div class="row" id="hshellbtns"></div>
+    <div class="status" id="hstatus" aria-live="polite"></div>
+    <div id="hquiz"></div>
+    <div class="row" style="margin-top:8px">
+      <button class="btn" id="hundo">1つもどす</button>
+      <button class="btn" id="hreset">やりなおす</button>
+      <button class="btn" id="hnext">つぎの元素</button>
+      <button class="btn" id="hrules">ルールを見なおす</button>
+    </div>
+    <p class="hint">この試作は1〜20番が対象です。中学のルール（K殻2個、L殻8個、M殻8個まで）で入れます。</p>
+  </div>
+
+  <div id="view-gousei" hidden>
+    <p class="lead">下から原子を選んで台に置き、原子をタップしてから、つなぎたい相手をタップ。手が全部つながると物質の完成です。線をタップすると1本はずれます。原子はドラッグで動かせます。</p>
+    <svg class="bench" id="bench" viewBox="0 0 360 290" aria-label="合成の台"></svg>
+    <div class="row" id="palseg" style="margin-top:8px"></div>
+    <div class="palette" id="palette" aria-label="原子を選ぶ"></div>
+    <p class="hint" id="parthint" hidden>丸い四角のキャラは「かたまりイオン」。いくつかの原子が先につながったかたまりで、全体で電子が多い（−）か少ない（＋）。中のつながり方は高校で習うので、ここではかたまりのまま使います。</p>
+    <div class="status" id="gstatus" aria-live="polite">まずは H を2つと O を1つ置いてみよう。</div>
+    <div class="row">
+      <button class="btn" id="gdel" disabled>えらんだ原子を消す</button>
+      <button class="btn" id="gclear">ぜんぶ片づける</button>
+    </div>
+    <div id="gresult"></div>
+    <section class="coll">
+      <h2>物質図鑑</h2>
+      <p class="count" id="gcount"></p>
+      <div class="cgrid" id="gcoll"></div>
+    </section>
+  </div>
+  <div id="view-hanabi" hidden>
+    <p class="lead">元素を選んで花火を打ち上げ、お題の色を出そう。2つまで混ぜられます。</p>
+    <div class="mission" id="fmission"></div>
+    <canvas id="sky" class="sky" aria-label="花火の夜空"></canvas>
+    <div class="fchips" id="fchips" aria-label="元素をえらぶ"></div>
+    <div class="row"><button class="btn launch" id="flaunch">打ち上げ</button><button class="btn" id="fclearsel">えらび直す</button></div>
+    <div class="status" id="fstatus" aria-live="polite">元素をタップして選び、打ち上げよう。</div>
+    <div id="fexplain"></div>
+    <section class="coll"><h2>お題</h2><p class="count" id="fcount"></p><div class="cgrid" id="fstages"></div></section>
+  </div>
+  <div id="view-semi" hidden>
+    <p class="lead">ケイ素の結晶に、ほかの元素を少しだけ混ぜて電気の流れ方を変えよう。最後は LED を光らせます。</p>
+    <div class="hpick" id="sstages" aria-label="ステージ"></div>
+    <div class="mission" id="smission"></div>
+    <svg class="bench" id="semi" viewBox="0 0 360 262" aria-label="半導体の回路"></svg>
+    <div class="row" id="stools" style="margin-top:8px"></div>
+    <div class="row" style="margin-top:8px">
+      <button class="btn launch" id="sswitch">スイッチを入れる</button>
+      <button class="btn" id="sflip">電池の向きを変える</button>
+      <button class="btn" id="sreset">やりなおす</button>
+    </div>
+    <div class="status" id="sstatus" aria-live="polite"></div>
+    <div id="sexplain"></div>
+  </div>
+  <div id="view-kigo" hidden>
+    <div class="tabs" style="margin-top:0">
+      <button class="tab" id="kseg-train" aria-selected="true">トレーニング</button>
+      <button class="tab" id="kseg-nazo" aria-selected="false">記号の謎解き</button>
+    </div>
+    <div id="ktrain">
+      <p class="lead">本線の30元素の記号を覚えよう。4択 → タイル → 手入力の順にレベルが上がり、手入力で正解すると「覚えた」。まちがえた元素は、少したってから復習に出ます。</p>
+      <div class="kstats" id="kstats"></div>
+      <div id="kcard"></div>
+      <div class="kmap" id="kmap"></div>
+      <p class="hint">数字は原子番号。覚えた元素だけ記号が出ます。白：まだ　うすい緑：4択クリア　こい緑：タイルクリア　緑：覚えた　点線：復習あり</p>
+    </div>
+    <div id="knazo" hidden>
+      <p class="lead">英語の名前と記号が合わない元素がある。記号のもとになったことばを当てて、暗号を解こう。</p>
+      <p class="count" id="ncount"></p>
+      <div id="ncard"></div>
+      <div class="cgrid" id="nlist" style="margin-top:12px"></div>
+    </div>
+  </div>
+  <div class="parentlink"><button class="btn" id="openParent">保護者メニュー</button></div>
+</main>
+<div class="overlay" id="lock" hidden><div class="ovbox" role="dialog" aria-modal="true" aria-labelledby="lockTitle">
+  <h2 id="lockTitle">今日はここまで</h2>
+  <p id="lockMsg"></p>
+  <p>つづけるには、おうちの人にパスワードを入れてもらおう。</p>
+  <div class="row"><input class="kin" id="lockPw" type="password" inputmode="numeric" autocomplete="off" placeholder="パスワード"><button class="btn launch" id="lockOk">30分のばす</button></div>
+  <p class="pmsg" id="lockErr"></p>
+</div></div>
+<div class="overlay" id="parent" hidden><div class="ovbox" role="dialog" aria-modal="true" aria-labelledby="parentTitle">
+  <h2 id="parentTitle">保護者メニュー</h2>
+  <div id="parentBody"></div>
+  <button class="close" id="parentClose">閉じる</button>
+</div></div>
+
+<div class="backdrop" id="backdrop"></div>
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sname">
+  <div class="sheet-top">
+    <div class="big" id="sbig"></div>
+    <div>
+      <div class="name" id="sname"></div>
+      <div class="meta" id="smeta"></div>
+    </div>
+  </div>
+  <h3>見た目のひみつ</h3>
+  <dl class="why" id="swhy"></dl>
+  <button class="close" id="sclose">閉じる</button>
+</div>
+
+<script>
+// ---- データ ----
+const E = [
+ [1,'H','水素',1,[1],1,1,'nonmetal'],
+ [2,'He','ヘリウム',4,[2],18,1,'noble'],
+ [3,'Li','リチウム',7,[2,1],1,2,'metal','#E5484D','赤'],
+ [4,'Be','ベリリウム',9,[2,2],2,2,'metal'],
+ [5,'B','ホウ素',11,[2,3],13,2,'metalloid'],
+ [6,'C','炭素',12,[2,4],14,2,'nonmetal'],
+ [7,'N','窒素',14,[2,5],15,2,'nonmetal'],
+ [8,'O','酸素',16,[2,6],16,2,'nonmetal'],
+ [9,'F','フッ素',19,[2,7],17,2,'nonmetal'],
+ [10,'Ne','ネオン',20,[2,8],18,2,'noble'],
+ [11,'Na','ナトリウム',23,[2,8,1],1,3,'metal','#F5B400','黄'],
+ [12,'Mg','マグネシウム',24,[2,8,2],2,3,'metal'],
+ [13,'Al','アルミニウム',27,[2,8,3],13,3,'metal'],
+ [14,'Si','ケイ素',28,[2,8,4],14,3,'metalloid'],
+ [15,'P','リン',31,[2,8,5],15,3,'nonmetal'],
+ [16,'S','硫黄',32,[2,8,6],16,3,'nonmetal'],
+ [17,'Cl','塩素',35.5,[2,8,7],17,3,'nonmetal'],
+ [18,'Ar','アルゴン',40,[2,8,8],18,3,'noble'],
+ [19,'K','カリウム',39,[2,8,8,1],1,4,'metal','#B38BEA','淡い紫'],
+ [20,'Ca','カルシウム',40,[2,8,8,2],2,4,'metal','#F2743B','橙赤'],
+].map(a=>({z:a[0],sym:a[1],name:a[2],mass:a[3],shells:a[4],group:a[5],period:a[6],kind:a[7],flame:a[8]||null,flameName:a[9]||null}));
+
+const EXTRA=[
+ {z:26,sym:'Fe',name:'鉄',mass:56,shells:[2,8,14,2],group:8,period:4,handsFixed:2,memo:'地球の中心にたくさんある。記号はラテン語の ferrum から。'},
+ {z:29,sym:'Cu',name:'銅',mass:64,shells:[2,8,18,1],group:11,period:4,handsFixed:2,flame:'#22B8A6',flameName:'青緑',memo:'10円玉の材料。記号はラテン語の cuprum（キプロス島が由来）から。'},
+ {z:30,sym:'Zn',name:'亜鉛',mass:65,shells:[2,8,18,2],group:12,period:4,handsFixed:2,memo:'トタン屋根や電池に使われる。'},
+ {z:47,sym:'Ag',name:'銀',mass:108,shells:[2,8,18,18,1],group:11,period:5,handsFixed:1,memo:'記号はラテン語の argentum から。アルゼンチンの国名のもと。'},
+ {z:50,sym:'Sn',name:'スズ',mass:119,shells:[2,8,18,18,4],group:14,period:5,handsFixed:2,memo:'ブリキやはんだに使われる。記号はラテン語の stannum から。'},
+ {z:53,sym:'I',name:'ヨウ素',mass:127,shells:[2,8,18,18,7],group:17,period:5,kind:'nonmetal',memo:'でんぷんにつけると青紫色になる（ヨウ素デンプン反応。だ液のはたらきを調べる実験で使う）。固体は黒紫色で、うがい薬にも使われる。'},
+ {z:56,sym:'Ba',name:'バリウム',mass:137,shells:[2,8,18,18,8,2],group:2,period:6,flame:'#9BD13B',flameName:'黄緑',memo:'胃の検査で飲むバリウムは、硫酸バリウムという物質。'},
+ {z:79,sym:'Au',name:'金',mass:197,shells:[2,8,18,32,18,1],group:11,period:6,handsFixed:1,ownColor:'#F2C744',shy:true,memo:'記号はラテン語の aurum から。'},
+ {z:80,sym:'Hg',name:'水銀',mass:201,shells:[2,8,18,32,18,2],group:12,period:6,handsFixed:2,memo:'ふつうの温度で液体になる、ただ一つの金属。記号はラテン語の hydrargyrum（水の銀）から。'},
+ {z:82,sym:'Pb',name:'鉛',mass:207,shells:[2,8,18,32,18,4],group:14,period:6,handsFixed:2,memo:'記号はラテン語の plumbum から。配管工 plumber と同じ語源で、昔は水道管に使われた。'},
+];
+EXTRA.forEach(o=>E.push({kind:'metal',flame:null,flameName:null,...o}));
+const REAL=new Set(E.map(e=>e.sym));
+function sec(z,sym,g,p){const v=g<=2?g:g>=13?g-10:null;return {z,sym,group:g,period:p,secret:true,shells:v?[v]:[2],kind:'secret'};}
+const SECRET=[];
+'Sc Ti V Cr Mn Fe Co Ni Cu Zn Ga Ge As Se Br Kr'.split(' ').forEach((sy,i)=>SECRET.push(sec(21+i,sy,i+3,4)));
+'Rb Sr Y Zr Nb Mo Tc Ru Rh Pd Ag Cd In Sn Sb Te I Xe'.split(' ').forEach((sy,i)=>SECRET.push(sec(37+i,sy,i+1,5)));
+'Cs Ba La-Lu Hf Ta W Re Os Ir Pt Au Hg Tl Pb Bi Po At Rn'.split(' ').forEach((sy,i)=>{const g=i+1;SECRET.push(sec(g===1?55:g===2?56:g===3?'57–71':68+g,sy,g,6));});
+'Fr Ra Ac-Lr Rf Db Sg Bh Hs Mt Ds Rg Cn Nh Fl Mc Lv Ts Og'.split(' ').forEach((sy,i)=>{const g=i+1;SECRET.push(sec(g===1?87:g===2?88:g===3?'89–103':100+g,sy,g,7));});
+'La Ce Pr Nd Pm Sm Eu Gd Tb Dy Ho Er Tm Yb Lu'.split(' ').forEach((sy,i)=>SECRET.push(Object.assign(sec(57+i,sy,3,6),{fb:'La',col:i+3})));
+'Ac Th Pa U Np Pu Am Cm Bk Cf Es Fm Md No Lr'.split(' ').forEach((sy,i)=>SECRET.push(Object.assign(sec(89+i,sy,3,7),{fb:'Ac',col:i+3})));
+for(let i=SECRET.length-1;i>=0;i--) if(REAL.has(SECRET[i].sym)) SECRET.splice(i,1);
+const I=(n,m,k,sh,memo,fl,fn)=>({n,m,k,sh,memo,fl,fn});
+const SECINFO={
+ Sc:I('スカンジウム',45,'metal',[2,8,9,2],'アルミニウムにまぜると、軽くて丈夫な合金になる。'),
+ Ti:I('チタン',48,'metal',[2,8,10,2],'軽くてさびにくい。メガネのフレームや人工の骨に使われる。'),
+ V:I('バナジウム',51,'metal',[2,8,11,2],'鉄にまぜると、工具が丈夫になる。'),
+ Cr:I('クロム',52,'metal',[2,8,13,1],'ステンレスやメッキに使われ、さびを防ぐ。'),
+ Mn:I('マンガン',55,'metal',[2,8,13,2],'乾電池の材料。'),
+ Co:I('コバルト',59,'metal',[2,8,15,2],'青い絵の具（コバルトブルー）や、リチウムイオン電池の材料。'),
+ Ni:I('ニッケル',59,'metal',[2,8,16,2],'銅とまぜて、50円玉や100円玉の材料になる。'),
+ Ga:I('ガリウム',70,'metal',[2,8,18,3],'手のひらの温度でとける金属。LEDの材料。'),
+ Ge:I('ゲルマニウム',73,'metalloid',[2,8,18,4],'昔のトランジスタ（半導体）に使われた。'),
+ As:I('ヒ素',75,'metalloid',[2,8,18,5],'毒として有名。ガリウムと組むと、赤外線LEDの材料になる。'),
+ Se:I('セレン',79,'nonmetal',[2,8,18,6],'体に少しだけ必要な元素。昔のコピー機に使われた。'),
+ Br:I('臭素',80,'nonmetal',[2,8,18,7],'ふつうの温度で液体になる非金属。赤茶色で、強いにおいがある。'),
+ Kr:I('クリプトン',84,'noble',[2,8,18,8],'電球の中に入れて、長持ちさせる。'),
+ Rb:I('ルビジウム',85,'metal',[2,8,18,8,1],'原子時計に使われる。','#C2185B','赤紫'),
+ Sr:I('ストロンチウム',88,'metal',[2,8,18,8,2],'花火の赤い色のもと。','#E0245E','紅'),
+ Y:I('イットリウム',89,'metal',[2,8,18,9,2],'白色LEDの光を作る材料（蛍光体）に使われる。'),
+ Zr:I('ジルコニウム',91,'metal',[2,8,18,10,2],'セラミックの包丁の材料。'),
+ Nb:I('ニオブ',93,'metal',[2,8,18,12,1],'MRIの強い磁石（超電導）に使われる。'),
+ Mo:I('モリブデン',96,'metal',[2,8,18,13,1],'鉄にまぜて強くする。体にも少しだけ必要。'),
+ Tc:I('テクネチウム',99,'metal',[2,8,18,13,2],'人工的に作られた最初の元素。'),
+ Ru:I('ルテニウム',101,'metal',[2,8,18,15,1],'パソコンのハードディスクに使われる。'),
+ Rh:I('ロジウム',103,'metal',[2,8,18,16,1],'車の排気ガスをきれいにする装置に使われる。'),
+ Pd:I('パラジウム',106,'metal',[2,8,18,18],'歯の詰め物や、排気ガスをきれいにする装置に使われる。'),
+ Cd:I('カドミウム',112,'metal',[2,8,18,18,2],'毒性があり、イタイイタイ病の原因になった。'),
+ In:I('インジウム',115,'metal',[2,8,18,18,3],'スマホの画面の透明な電極に使われる。名前は炎の色の藍（インジゴ）から。','#4B3FA0','藍'),
+ Sb:I('アンチモン',122,'metalloid',[2,8,18,18,5],'物を燃えにくくする薬に使われる。'),
+ Te:I('テルル',128,'metalloid',[2,8,18,18,6],'太陽電池の材料。'),
+ Xe:I('キセノン',131,'noble',[2,8,18,18,8],'車のヘッドライトやカメラのフラッシュの光。'),
+ Cs:I('セシウム',133,'metal',[2,8,18,18,8,1],'「1秒」の長さを決める原子時計に使われる。','#6A5ACD','青紫'),
+ 'La-Lu':I('ランタノイド','—','metal',[2,8,18,18,9,2],'57〜71番の15個が、この1マスにまとめて入っている。一つずつは表の下の段にならんでいる。ネオジム磁石など、強力な磁石に使われる。'),
+ 'Ac-Lr':I('アクチノイド','—','metal',[2,8,18,32,18,9,2],'89〜103番の15個が、この1マスにまとめて入っている。一つずつは表のいちばん下の段にならんでいる。ウランなど、放射線を出す元素が多い。'),
+ La:I('ランタン',139,'metal',[2,8,18,18,9,2],'ランタノイドの最初。カメラのレンズのガラスに使われる。'),
+ Ce:I('セリウム',140,'metal',[2,8,18,19,9,2],'ガラスをみがく粉や、ライターの火打ち石に使われる。'),
+ Pr:I('プラセオジム',141,'metal',[2,8,18,21,8,2],'焼き物の黄色や、強力な磁石に使われる。'),
+ Nd:I('ネオジム',144,'metal',[2,8,18,22,8,2],'とても強い磁石（ネオジム磁石）の材料。イヤホンやモーターに使われる。'),
+ Pm:I('プロメチウム',145,'metal',[2,8,18,23,8,2],'自然界にほとんどない、放射線を出す元素。'),
+ Sm:I('サマリウム',150,'metal',[2,8,18,24,8,2],'熱に強い磁石（サマリウムコバルト磁石）に使われる。'),
+ Eu:I('ユウロピウム',152,'metal',[2,8,18,25,8,2],'赤く光る蛍光体。ユーロ紙幣の偽造防止にも使われる。'),
+ Gd:I('ガドリニウム',157,'metal',[2,8,18,25,9,2],'MRI検査の造影剤に使われる。'),
+ Tb:I('テルビウム',159,'metal',[2,8,18,27,8,2],'緑に光る蛍光体に使われる。'),
+ Dy:I('ジスプロシウム',163,'metal',[2,8,18,28,8,2],'ネオジム磁石を熱に強くする。電気自動車のモーターに使われる。'),
+ Ho:I('ホルミウム',165,'metal',[2,8,18,29,8,2],'医療用のレーザーに使われる。'),
+ Er:I('エルビウム',167,'metal',[2,8,18,30,8,2],'光ファイバーの信号を強くする。'),
+ Tm:I('ツリウム',169,'metal',[2,8,18,31,8,2],'ランタノイドの中でも、とくに少ない元素。'),
+ Yb:I('イッテルビウム',173,'metal',[2,8,18,32,8,2],'スウェーデンのイッテルビー村から。この村の名前から4つの元素名が生まれた。'),
+ Lu:I('ルテチウム',175,'metal',[2,8,18,32,9,2],'名前はパリの古い呼び名「ルテティア」から。'),
+ Fr:I('フランシウム',223,'metal',[2,8,18,32,18,8,1],'フランスから名づけた。とても不安定で、すぐに別の元素に変わる。'),
+ Ra:I('ラジウム',226,'metal',[2,8,18,32,18,8,2],'キュリー夫妻が発見。暗やみで光ることで有名だった。'),
+ Ac:I('アクチニウム',227,'metal',[2,8,18,32,18,9,2],'アクチノイドの最初。暗やみで青白く光る。'),
+ Th:I('トリウム',232,'metal',[2,8,18,32,18,10,2],'北欧神話の雷の神トールから名づけた。'),
+ Pa:I('プロトアクチニウム',231,'metal',[2,8,18,32,20,9,2],'とても少ない、放射線を出す元素。'),
+ U:I('ウラン',238,'metal',[2,8,18,32,21,9,2],'原子力発電の燃料。天王星（ウラヌス）から名づけた。'),
+ Np:I('ネプツニウム',237,'metal',[2,8,18,32,22,9,2],'海王星（ネプチューン）から名づけた。'),
+ Pu:I('プルトニウム',244,'metal',[2,8,18,32,24,8,2],'冥王星（プルート）から名づけた。'),
+ Am:I('アメリシウム',243,'metal',[2,8,18,32,25,8,2],'アメリカから名づけた。煙感知器に使われる。'),
+ Cm:I('キュリウム',247,'metal',[2,8,18,32,25,9,2],'キュリー夫妻の名前から。'),
+ Bk:I('バークリウム',247,'metal',[2,8,18,32,27,8,2],'アメリカのバークレーから。'),
+ Cf:I('カリホルニウム',251,'metal',[2,8,18,32,28,8,2],'アメリカのカリフォルニアから。'),
+ Es:I('アインスタイニウム',252,'metal',[2,8,18,32,29,8,2],'科学者アインシュタインの名前から。'),
+ Fm:I('フェルミウム',257,'metal',[2,8,18,32,30,8,2],'科学者フェルミの名前から。'),
+ Md:I('メンデレビウム',258,'metal',[2,8,18,32,31,8,2],'周期表を作ったメンデレーエフの名前から。'),
+ No:I('ノーベリウム',259,'metal',[2,8,18,32,32,8,2],'ノーベル賞のノーベルの名前から。'),
+ Lr:I('ローレンシウム',262,'metal',[2,8,18,32,32,8,3],'科学者ローレンスの名前から。'),
+ Rf:I('ラザホージウム',267,'metal',[2,8,18,32,32,10,2],'原子核を発見したラザフォードの名前から。'),
+ Db:I('ドブニウム',268,'metal',[2,8,18,32,32,11,2],'ロシアの研究都市ドゥブナから。'),
+ Sg:I('シーボーギウム',269,'metal',[2,8,18,32,32,12,2],'科学者シーボーグの名前から。'),
+ Bh:I('ボーリウム',270,'metal',[2,8,18,32,32,13,2],'原子のしくみを研究したボーアの名前から。'),
+ Hs:I('ハッシウム',269,'metal',[2,8,18,32,32,14,2],'ドイツのヘッセン州から。'),
+ Mt:I('マイトネリウム',278,'metal',[2,8,18,32,32,15,2],'女性科学者マイトナーの名前から。'),
+ Ds:I('ダームスタチウム',281,'metal',[2,8,18,32,32,16,2],'ドイツのダルムシュタットから。'),
+ Rg:I('レントゲニウム',282,'metal',[2,8,18,32,32,17,2],'X線を発見したレントゲンの名前から。'),
+ Cn:I('コペルニシウム',285,'metal',[2,8,18,32,32,18,2],'地動説のコペルニクスの名前から。'),
+ Nh:I('ニホニウム',286,'metal',[2,8,18,32,32,18,3],'日本の理化学研究所が作った。アジアではじめて名前をつけた元素で、名前は「日本」から。'),
+ Fl:I('フレロビウム',289,'metal',[2,8,18,32,32,18,4],'ロシアの研究所を作ったフリョロフの名前から。'),
+ Mc:I('モスコビウム',290,'metal',[2,8,18,32,32,18,5],'ロシアのモスクワ州から。'),
+ Lv:I('リバモリウム',293,'metal',[2,8,18,32,32,18,6],'アメリカのリバモア研究所から。'),
+ Ts:I('テネシン',294,'metalloid',[2,8,18,32,32,18,7],'アメリカのテネシー州から。'),
+ Og:I('オガネソン',294,'noble',[2,8,18,32,32,18,8],'科学者オガネシアンの名前から。いま知られている中でいちばん重い元素。'),
+ Hf:I('ハフニウム',178,'metal',[2,8,18,32,10,2],'原子炉の制御棒に使われる。'),
+ Ta:I('タンタル',181,'metal',[2,8,18,32,11,2],'スマホの小さな部品（コンデンサー）に使われる。'),
+ W:I('タングステン',184,'metal',[2,8,18,32,12,2],'電球のフィラメント。記号はドイツ語の Wolfram から。'),
+ Re:I('レニウム',186,'metal',[2,8,18,32,13,2],'ジェットエンジンの部品に使われる。'),
+ Os:I('オスミウム',190,'metal',[2,8,18,32,14,2],'いちばん重い（密度が大きい）元素のひとつ。'),
+ Ir:I('イリジウム',192,'metal',[2,8,18,32,15,2],'とてもさびにくく、万年筆のペン先に使われる。'),
+ Pt:I('白金',195,'metal',[2,8,18,32,17,1],'プラチナとも呼ぶ。指輪や、排気ガスをきれいにする装置に使われる。記号はスペイン語の platina（小さな銀）から。'),
+ Tl:I('タリウム',204,'metal',[2,8,18,32,18,3],'毒性が強い。名前は炎の緑色（ギリシャ語の「若い芽」）から。','#5DBB63','緑'),
+ Bi:I('ビスマス',209,'metal',[2,8,18,32,18,5],'虹色の結晶ができる。胃薬にも使われる。'),
+ Po:I('ポロニウム',210,'metal',[2,8,18,32,18,6],'放射線を出す。キュリー夫人が発見し、祖国ポーランドから名づけた。'),
+ At:I('アスタチン',210,'metalloid',[2,8,18,32,18,7],'地球上にほとんどない、とてもめずらしい元素。'),
+ Rn:I('ラドン',222,'noble',[2,8,18,32,18,8],'放射線を出す気体。ラドン温泉が有名。'),
+};
+let unlocked=new Set(); try{unlocked=new Set(JSON.parse(localStorage.getItem('zukan-unlocked')||'[]'));}catch(_){}
+function realize(e){const x=SECINFO[e.sym];Object.assign(e,{name:x.n,mass:x.m,kind:x.k,shells:x.sh,memo:x.memo,flame:x.fl||null,flameName:x.fn||null,secret:false,unlocked:true});}
+SECRET.forEach(e=>{if(unlocked.has(e.sym)) realize(e);});
+const TOTAL_SECRET=SECRET.length;
+setTimeout(()=>updateUnlockCount(),0);
+const ALL = E.concat(SECRET);
+const TRANSITION = {name:'遷移金属',shape:'八角形',note:'第4周期から登場する元素たち。外側の部屋より先に、内側の部屋が埋まり直す「ルール破り」のなかま。発展モードで出会える。'};
+const GROUPS = {
+ 1:{name:'アルカリ金属のなかま',shape:'丸',note:'外側の電子が1個。1個手放すと内側の満杯の形になるので、手は1本。（水素だけは金属ではなく、紫の手をもつ例外）'},
+ 2:{name:'アルカリ土類金属のなかま',shape:'角の丸い四角',note:'外側の電子が2個。2個手放すと満杯の形になるので、手は2本。'},
+ 13:{name:'ホウ素のなかま',shape:'三角',note:'外側の電子が3個。3個を使ってつながるので、手は3本。'},
+ 14:{name:'炭素のなかま',shape:'六角形',note:'外側の電子が4個。手放すにも受け取るにも4個なので、手は4本。がっちりした結晶を作る。'},
+ 15:{name:'窒素のなかま',shape:'五角形',note:'外側の電子が5個。満杯の8個まであと3個なので、手は3本。'},
+ 16:{name:'酸素のなかま',shape:'しずく',note:'外側の電子が6個。満杯まであと2個なので、手は2本。'},
+ 17:{name:'ハロゲン',shape:'トゲトゲ',note:'外側の電子が7個。あと1個で満杯なので、手は1本。1個をとても欲しがる。'},
+ 18:{name:'希ガス',shape:'殻つきの丸',note:'外側の部屋が満杯。手はいらないので0本。だれとも結合しない。'},
+};
+const COLS = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18];
+const gInfo = g => GROUPS[g] || TRANSITION;
+const KIND = {
+ metal:{color:'#B8C4D0',label:'金属なので銀色'},
+ metalloid:{color:'#7FA7B8',label:'半金属（金属と非金属の間）なので青灰色'},
+ nonmetal:{color:'#79D6A6',label:'非金属なのでミント色'},
+ noble:{color:'#C7B6FF',label:'希ガスなのでネオンのように光るラベンダー色'},
+};
+const INK = '#1F2A44';
+
+const valence = e => e.shells[e.shells.length-1];
+function hands(e){
+  if(e.part) return Math.abs(e.charge);
+  if(e.handsFixed!=null) return e.handsFixed;
+  if(typeof e.z==='number'&&e.z>=104&&!e.secret) return 0;
+  if(e.group===18) return 0;
+  if(e.group>=3&&e.group<=12) return 0;
+  if(e.z===1) return 1;
+  const v = valence(e);
+  return v<=4 ? v : 8-v;
+}
+function handType(e){
+  if(e.part) return e.charge<0?'minus':'plus';
+  if(e.group===18) return null;
+  if(e.kind==='metal') return 'plus';
+  if(e.z===1) return 'both';
+  const v=valence(e);
+  if(e.z===1||v<=3) return 'plus';
+  if(v===4) return 'both';
+  return 'minus';
+}
+const HAND = {
+ plus:{color:'#FF6B4A',sign:'+',label:'＋の手（赤）',text:'電子を手放して＋（プラス）のイオンになりやすい'},
+ minus:{color:'#3D8BFF',sign:'−',label:'−の手（青）',text:'電子を受け取って−（マイナス）のイオンになりやすい'},
+ both:{color:'#A56BFF',sign:'±',label:'±の手（紫）',text:'手放す数と受け取る数が同じで、どちらとも言えない。非金属とは電子を出し合って共有でつながる'},
+};
+const bodyR = e => ({1:17,2:21,3:24,4:27,5:29,6:31,7:32})[e.period];
+const color = e => e.flame || e.ownColor || KIND[e.kind].color;
+
+// ---- 形 ----
+function poly(n,r,rot,cx=50,cy=50){
+  const p=[];
+  for(let i=0;i<n;i++){const a=(rot+360*i/n)*Math.PI/180;p.push((cx+r*Math.cos(a)).toFixed(1)+','+(cy+r*Math.sin(a)).toFixed(1));}
+  return p.join(' ');
+}
+function star(r){
+  const p=[];
+  for(let i=0;i<16;i++){const rr=i%2?r*0.86:r*1.14;const a=(-90+22.5*i)*Math.PI/180;p.push((50+rr*Math.cos(a)).toFixed(1)+','+(50+rr*Math.sin(a)).toFixed(1));}
+  return p.join(' ');
+}
+function bodyShape(e,r,fill,ink=INK){
+  const s=`fill="${fill}" stroke="${ink}" stroke-width="2.6" stroke-linejoin="round"`;
+  switch(e.group){
+    case 1: return `<circle cx="50" cy="50" r="${r}" ${s}/>`;
+    case 2: return `<rect x="${50-r*0.92}" y="${50-r*0.92}" width="${r*1.84}" height="${r*1.84}" rx="${r*0.38}" ${s}/>`;
+    case 13: return `<polygon points="${poly(3,r*1.3,-90,50,55)}" ${s}/>`;
+    case 14: return `<polygon points="${poly(6,r*1.08,0)}" ${s}/>`;
+    case 15: return `<polygon points="${poly(5,r*1.1,-90,50,52)}" ${s}/>`;
+    case 16: {
+      const t=50-r*1.3, b=50+0.12*r;
+      return `<path d="M50 ${t} C${50+0.25*r} ${50-0.85*r} ${50+r} ${50-0.35*r} ${50+r} ${b} A${r} ${r} 0 0 1 ${50-r} ${b} C${50-r} ${50-0.35*r} ${50-0.25*r} ${50-0.85*r} 50 ${t} Z" ${s}/>`;
+    }
+    case 17: return `<polygon points="${star(r)}" ${s}/>`;
+    default: return `<polygon points="${poly(8,r*1.05,22.5)}" ${s}/>`;
+    case 18: return `<circle cx="50" cy="50" r="${r+5}" fill="none" stroke="${fill}" stroke-width="3"/><circle cx="50" cy="50" r="${r}" ${s}/>`;
+  }
+}
+const ARM_ANGLES = {1:[-35],2:[-20,200],3:[-20,200,-90],4:[-25,205,-62,242]};
+function arms(e,r,fill,ink=INK,nOv=null){
+  const n=nOv??hands(e); if(!n) return '';
+  const H=ink===INK?HAND[handType(e)]:{color:ink,sign:''};
+  return ARM_ANGLES[n].map(d=>{
+    const a=d*Math.PI/180, x1=50+r*0.8*Math.cos(a), y1=50+r*0.8*Math.sin(a);
+    const x2=50+(r+13)*Math.cos(a), y2=50+(r+13)*Math.sin(a);
+    return `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${ink}" stroke-width="2.6" stroke-linecap="round"/><circle cx="${x2.toFixed(1)}" cy="${y2.toFixed(1)}" r="5" fill="${H.color}" stroke="${ink}" stroke-width="1.8"/>${sign(H.sign,x2,y2)}`;
+  }).join('');
+}
+function sign(t,x,y){
+  if(!t) return '';
+  const w='stroke="#fff" stroke-width="1.6" stroke-linecap="round"';
+  let d='';
+  if(t==='+'||t==='±') d+=`<line x1="${(x-2.4).toFixed(1)}" y1="${y.toFixed(1)}" x2="${(x+2.4).toFixed(1)}" y2="${y.toFixed(1)}" ${w}/><line x1="${x.toFixed(1)}" y1="${(y-2.4).toFixed(1)}" x2="${x.toFixed(1)}" y2="${(y+2.4).toFixed(1)}" ${w}/>`;
+  if(t==='−') d+=`<line x1="${(x-2.4).toFixed(1)}" y1="${y.toFixed(1)}" x2="${(x+2.4).toFixed(1)}" y2="${y.toFixed(1)}" ${w}/>`;
+  if(t==='±') d=`<line x1="${(x-2.2).toFixed(1)}" y1="${(y-0.8).toFixed(1)}" x2="${(x+2.2).toFixed(1)}" y2="${(y-0.8).toFixed(1)}" ${w}/><line x1="${x.toFixed(1)}" y1="${(y-2.8).toFixed(1)}" x2="${x.toFixed(1)}" y2="${(y+1.2).toFixed(1)}" ${w}/><line x1="${(x-2.2).toFixed(1)}" y1="${(y+2.6).toFixed(1)}" x2="${(x+2.2).toFixed(1)}" y2="${(y+2.6).toFixed(1)}" ${w}/>`;
+  return d;
+}
+function face(e,r,happy=false){
+  const ey=50-r*0.04+(e.group===13?4:0)+(e.group===16?3:0), ex=r*0.34, er=Math.max(2.2,r*0.1);
+  let eyes;
+  if(e.group===18||happy){
+    eyes=[-1,1].map(s=>`<path d="M${50+s*ex-er*1.3} ${ey+er*0.5} Q${50+s*ex} ${ey-er*1.4} ${50+s*ex+er*1.3} ${ey+er*0.5}" fill="none" stroke="${INK}" stroke-width="2" stroke-linecap="round"/>`).join('');
+  }else{
+    eyes=[-1,1].map(s=>`<circle cx="${50+s*ex}" cy="${ey}" r="${er}" fill="${INK}"/>`).join('');
+    if(e.group===17) eyes+=[-1,1].map(s=>`<line x1="${50+s*ex-s*er*1.4}" y1="${ey-er*2.6}" x2="${50+s*ex+s*er*1.2}" y2="${ey-er*1.7}" stroke="${INK}" stroke-width="1.8" stroke-linecap="round"/>`).join('');
+  }
+  const my=ey+r*0.32, mw=r*0.2;
+  const mouth=`<path d="M${50-mw} ${my} Q50 ${my+r*0.2} ${50+mw} ${my}" fill="none" stroke="${INK}" stroke-width="2" stroke-linecap="round"/>`;
+  const cheeks=[-1,1].map(s=>`<ellipse cx="${50+s*r*0.55}" cy="${my-1}" rx="${r*0.13}" ry="${r*0.08}" fill="#FF6F91" opacity=".35"/>`).join('');
+  return eyes+cheeks+mouth;
+}
+function electrons(e,r){
+  const v=valence(e), R=r+19;
+  let s=`<circle cx="50" cy="50" r="${R}" fill="none" stroke="currentColor" stroke-opacity=".35" stroke-width="1" stroke-dasharray="2 3"/>`;
+  for(let i=0;i<v;i++){const a=(-90+360*i/v)*Math.PI/180;s+=`<circle cx="${(50+R*Math.cos(a)).toFixed(1)}" cy="${(50+R*Math.sin(a)).toFixed(1)}" r="2.8" fill="#FFC21A" stroke="${INK}" stroke-width="1"/>`;}
+  return s;
+}
+function charSVG(e,{withElectrons=false,handsN=null,happy=false}={}){
+  const r=bodyR(e);
+  if(e.secret){
+    return `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">${arms(e,r,'currentColor','currentColor')}${bodyShape(e,r,'currentColor','currentColor')}<text x="50" y="${50+r*0.35}" text-anchor="middle" font-size="${r*1.1}" font-weight="800" fill="var(--bg)">?</text></svg>`;
+  }
+  const f=color(e);
+  const vb=withElectrons?'-4 -4 108 108':'0 0 100 100';
+  return `<svg viewBox="${vb}" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">${withElectrons?electrons(e,r):''}${arms(e,r,f,INK,handsN)}${bodyShape(e,r,f)}${face(e,r,happy)}</svg>`;
+}
+
+// ---- 周期表 ----
+const table=document.getElementById('ptable');
+const caption=document.getElementById('caption');
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+table.insertAdjacentHTML('beforeend','<div class="corner"></div>');
+COLS.forEach(g=>{
+  const b=document.createElement('button');
+  b.className='ghead'; b.textContent=g+'族'; b.setAttribute('aria-pressed','false'); b.dataset.g=g;
+  b.addEventListener('click',()=>toggleGroup(g,b));
+  table.appendChild(b);
+});
+const cellBySym={};
+function makeCell(e){
+  const c=document.createElement('button');
+  c.className='cell'+(e.secret?' secret':''); c.dataset.g=e.group;
+  c.setAttribute('aria-label',e.secret?`${e.z}番 ひみつの元素`:`${e.z}番 ${e.name}`);
+  c.innerHTML=`<span class="num">${e.z}</span>${charSVG(e)}<span class="sym">${e.secret?'?':e.sym}</span>`;
+  c.addEventListener('click',()=>openSheet(e));
+  cellBySym[e.sym]=c; return c;
+}
+for(let p=1;p<=7;p++){
+  table.insertAdjacentHTML('beforeend',`<div class="plabel">${p}</div>`);
+  COLS.forEach(g=>{
+    const e=ALL.find(x=>x.period===p&&x.group===g&&!x.fb);
+    if(!e){table.insertAdjacentHTML('beforeend','<div class="empty"></div>');return;}
+    const c=document.createElement('button');
+    c.className='cell'+(e.secret?' secret':''); c.dataset.g=g;
+    c.setAttribute('aria-label',e.secret?`${e.z}番 ひみつの元素`:`${e.z}番 ${e.name}`);
+    c.innerHTML=`<span class="num">${e.z}</span>${charSVG(e)}<span class="sym">${e.secret?'?':e.sym}</span>`;
+    if(!reduce&&!e.secret){c.querySelector('svg').classList.add('pop');c.querySelector('svg').style.animationDelay=(E.indexOf(e)*40)+'ms';}
+    c.addEventListener('click',()=>openSheet(e));
+    cellBySym[e.sym]=c;
+    table.appendChild(c);
+  });
+}
+table.insertAdjacentHTML('beforeend','<div style="grid-column:1/-1;height:8px"></div>');
+[['La','ランタノイド',6],['Ac','アクチノイド',7]].forEach(([fb,label,p])=>{
+  table.insertAdjacentHTML('beforeend',`<div class="plabel">${p}</div><div class="flabel">${label}</div>`);
+  ALL.filter(x=>x.fb===fb).sort((a,b)=>a.col-b.col).forEach(e=>table.appendChild(makeCell(e)));
+  table.insertAdjacentHTML('beforeend','<div class="empty"></div>');
+});
+let activeG=null;
+function toggleGroup(g,btn){
+  document.querySelectorAll('.ghead').forEach(b=>b.setAttribute('aria-pressed','false'));
+  document.querySelectorAll('.cell').forEach(c=>c.classList.remove('hit'));
+  if(activeG===g){activeG=null;table.classList.remove('filtered');caption.textContent='列の見出し（1族〜18族）をタップしてみてください。';return;}
+  activeG=g; btn.setAttribute('aria-pressed','true'); table.classList.add('filtered');
+  document.querySelectorAll(`.cell[data-g="${g}"]`).forEach(c=>c.classList.add('hit'));
+  const G=gInfo(g);
+  caption.innerHTML=`<b>${g}族 ${G.name}</b>（形：${G.shape}）<br>${G.note}`;
+}
+
+// ---- 詳細シート ----
+const sheet=document.getElementById('sheet'), backdrop=document.getElementById('backdrop');
+let lastFocus=null;
+function handsReason(e){
+  const n=hands(e), v=valence(e);
+  if(typeof e.z==='number'&&e.z>=104) return '人工的に、ほんの数個しか作られていない元素。すぐに別の元素に変わってしまうので、性質（手の数）はまだよくわかっていない';
+  if(e.group>=3&&e.group<=12&&e.handsFixed==null) return '遷移金属は手の数のルールが破れる元素。相手によって手の数が変わるので、この図鑑では手を描いていない';
+  if(e.sym==='Bi'||e.sym==='Po') return `外側の電子は${v}個。でも下の段にいくほど金属っぽくなり、${e.name}は金属。電子を手放す側なので赤い手${n}本`;
+  if(e.shy) return `外側の電子は${v}個で手は1本。でも金は電子をなかなか手放さないので、ほとんどだれともつながらない。だからさびない`;
+  if(e.handsFixed!=null){
+    const io=e.sym+['','','²','³'][n]+'⁺';
+    if(e.group===14) return `14族だけど、下の段の${e.name}は金属。中学ではイオン ${io} として使うので手は${n}本`;
+    return `外側の電子は${v}個だけど、${e.name}は手の数のルールが破れる遷移金属。中学ではイオン ${io} として使うので手は${n}本（本当は手の数が変わることもある）`;
+  }
+  if(e.group===18) return `外側の部屋が満杯（${v}個）。つなぐ必要がないので手は0本`;
+  if(e.z===1) return `部屋（K殻）の定員は2個で、電子は1個。1個手放すのも、1個受け取ってヘリウムと同じ満杯になるのも、動かすのは1個で同じ。だから手は1本`;
+  if(v<=4) return `外側の電子が${v}個。これを使ってつながるので手は${n}本`;
+  return `外側の電子が${v}個。満杯の8個まであと${8-v}個なので手は${n}本`;
+}
+function ionNote(e){
+  const n=hands(e), t=handType(e), sup=['','','²','³'][n];
+  if(e.shy) return '。ただし金はほとんどイオンにならない';
+  if(e.z===1) return '。相手しだいで、塩素のように電子を引っぱる力が強い相手には電子を持っていかれて H⁺（酸の中）、ナトリウムのように弱い相手からは電子を受け取って H⁻ になる';
+  if(e.z===5) return '（ただしホウ素は実際にはイオンになりにくく、共有でつながることが多い）';
+  if(t==='plus') return `。イオンになると ${e.sym}${sup}⁺`;
+  if(t==='minus') return `。イオンになると ${e.sym}${sup}⁻`;
+  return '';
+}
+const MAIN_G=[1,2,13,14,15,16,17,18];
+const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;};
+function handLabel(e){const n=hands(e);if(!n)return '手なし（0本）';return ({plus:'赤い手',minus:'青い手',both:'紫の手'})[handType(e)]+n+'本';}
+const HAND_POOL=['赤い手1本','赤い手2本','赤い手3本','紫の手4本','青い手3本','青い手2本','青い手1本','手なし（0本）'];
+function pickOpts(correct,pool){return shuffle([correct,...shuffle(pool.filter(x=>x!==correct)).slice(0,3)]);}
+let QZ=null;
+function openSecret(e){
+  QZ={e,step:0};
+  document.getElementById('sbig').innerHTML=`<div style="color:var(--ink);opacity:.25">${charSVG(e)}</div>`;
+  document.getElementById('sname').innerHTML=`？？？<small>影当てクイズ</small>`;
+  document.getElementById('smeta').innerHTML=`原子番号 ${e.z}　第${e.period}周期 ${e.fb?(e.fb==='La'?'ランタノイド':'アクチノイド'):e.group+'族'}`;
+  renderQuiz('');
+  backdrop.classList.add('open'); sheet.classList.add('open');
+  document.getElementById('sclose').focus();
+}
+function quizSpec(){
+  const e=QZ.e, isT=e.group>=3&&e.group<=12;
+  if(e.sym==='La-Lu'||e.sym==='Ac-Lr') return {q:'この1マスには、元素が何個まとめて入っている？',opts:['5個','10個','15個','30個'],ans:'15個',hint:e.sym==='La-Lu'?'57番から71番まで数えてみよう。':'89番から103番まで数えてみよう。'};
+  if(e.fb){const x=SECINFO[e.sym];const names=SECRET.filter(s=>s.fb===e.fb).map(s=>SECINFO[s.sym].n);
+    return {q:`記号「${e.sym}」の元素はどれ？`,pre:`ヒント：${x.memo.split(x.n).join('○○')}`,opts:pickOpts(x.n,names),ans:x.n,hint:'記号の文字と、名前の読み方を見くらべてみよう。'};}
+  if(isT){const x=SECINFO[e.sym];const names=SECRET.filter(s=>s.group>=3&&s.group<=12&&!s.fb&&s.period===e.period&&!/-/.test(s.sym)).map(s=>SECINFO[s.sym].n);
+    return {q:`記号「${e.sym}」の元素はどれ？`,pre:`ヒント：${x.memo.split(x.n).join('○○')}`,opts:pickOpts(x.n,names),ans:x.n,hint:'記号の文字と、名前の読み方を見くらべてみよう。'};}
+  if(QZ.step===0){const names=MAIN_G.map(g=>GROUPS[g].name);
+    return {q:'この影は、どのなかま？',pre:`影の形と、同じ列（${e.group}族）の上の段にいる元素を見てみよう。`,opts:pickOpts(GROUPS[e.group].name,names),ans:GROUPS[e.group].name,hint:`${e.group}族の列を見てみよう。形は「${GROUPS[e.group].shape}」。`};}
+  const tmp=Object.assign({},e,SECRET_KIND(e));
+  const metalHint=tmp.kind==='metal'&&e.group>=13?`ヒント：この元素は金属。`:'';
+  return {q:'手の色と数は？',pre:metalHint||`${e.group}族の外側の電子は${valence(tmp)}個。ルール3を思い出そう。`,opts:pickOpts(handLabel(tmp),HAND_POOL),ans:handLabel(tmp),
+    hint:tmp.kind==='metal'?'金属は電子を手放す側。':`外側の電子は${valence(tmp)}個。手放すのと受け取るの、少ない方は？`};
+}
+function SECRET_KIND(e){const x=SECINFO[e.sym];return {kind:x.k,shells:x.sh};}
+function renderQuiz(msg,warn){
+  const sp=quizSpec();
+  document.getElementById('swhy').innerHTML=`<dt>問題</dt><dd><b>${sp.q}</b>${sp.pre?`<br><span style="color:var(--muted)">${sp.pre}</span>`:''}
+    <div class="row" style="margin-top:8px">${sp.opts.map(o=>`<button class="opt" data-o="${o}">${o}</button>`).join('')}</div>
+    ${msg?`<p style="margin:8px 0 0;color:${warn?'#FF6B4A':'inherit'}">${msg}</p>`:''}</dd>`;
+  document.querySelectorAll('#swhy .opt').forEach(b=>b.addEventListener('click',()=>{
+    if(b.dataset.o!==sp.ans){renderQuiz(`ちがうみたい。${sp.hint}`,true);return;}
+    const e=QZ.e, main=MAIN_G.includes(e.group)&&!e.fb;
+    if(main&&QZ.step===0&&e.z<104){QZ.step=1;renderQuiz('正解！ つぎの問題。');return;}
+    unlockEl(e);
+  }));
+}
+function unlockEl(e){
+  unlocked.add(e.sym); try{localStorage.setItem('zukan-unlocked',JSON.stringify([...unlocked]));}catch(_){}
+  realize(e);
+  const c=cellBySym[e.sym];
+  if(c){c.className='cell';c.setAttribute('aria-label',`${e.z}番 ${e.name}`);c.innerHTML=`<span class="num">${e.z}</span>${charSVG(e)}<span class="sym">${e.sym}</span>`;}
+  updateUnlockCount();
+  document.getElementById('sbig').innerHTML=`<div class="${reduce?'':'bob'}" style="color:var(--ink)">${charSVG(e)}</div>`;
+  document.getElementById('sname').innerHTML=`${e.sym}<small>${e.name}</small>`;
+  document.getElementById('swhy').innerHTML=`<dt>解放！</dt><dd>${e.memo}<div class="row" style="margin-top:8px"><button class="opt" id="qsee">くわしく見る</button></div></dd>`;
+  document.getElementById('qsee').addEventListener('click',()=>openSheet(e));
+}
+function updateUnlockCount(){const el=document.getElementById('unlockCount');if(el)el.textContent=`ひみつの元素：${unlocked.size}/${TOTAL_SECRET} 解放`;}
+function openSheet(e){
+  lastFocus=document.activeElement;
+  if(e.secret) return openSecret(e);
+  const G=gInfo(e.group);
+  document.getElementById('sbig').innerHTML=`<div class="${reduce?'':'bob'}" style="color:var(--ink)">${charSVG(e,{withElectrons:true})}</div>`;
+  document.getElementById('sname').innerHTML=`${e.sym}<small>${e.name}</small>`;
+  document.getElementById('smeta').innerHTML=`原子番号 ${e.z}　原子量 ${e.mass}<br>電子配置 ${e.shells.join('・')}`;
+  const colorWhy=e.flame?`炎色反応が${e.flameName}なので、その炎の色${e.sym==='Cu'?'（銅そのものは赤っぽいけれど、炎は青緑）':''}`:e.ownColor?'金属なのにめずらしく、金そのものに色があるので金色':KIND[e.kind].label;
+  document.getElementById('swhy').innerHTML=
+    `<dt>形</dt><dd>${G.shape}。${e.group}族（${G.name}）の形${e.z===1?'。水素は金属ではないけれど同じ列にいる':''}</dd>`+
+    `<dt>手</dt><dd>${handsReason(e)}</dd>`+
+    ((handType(e)&&hands(e)>0)?`<dt>手の色</dt><dd>${HAND[handType(e)].label}。${HAND[handType(e)].text}${ionNote(e)}</dd>`:'')+
+    `<dt>大きさ</dt><dd>第${e.period}周期。電子の部屋が${e.period}つあるので${['','いちばん小さい','小さめ','ふつう','大きめ','もっと大きい','とても大きい','いちばん大きい'][e.period]}</dd>`+
+    `<dt>色</dt><dd>${colorWhy}</dd>`+
+    `<dt>黄色い点</dt><dd>外側の部屋にいる電子（${valence(e)}個）</dd>`+
+    (e.memo?`<dt>メモ</dt><dd>${e.memo}</dd>`:'');
+  backdrop.classList.add('open'); sheet.classList.add('open');
+  document.getElementById('sclose').focus();
+}
+function closeSheet(){
+  sheet.classList.remove('open'); backdrop.classList.remove('open');
+  if(lastFocus) lastFocus.focus();
+}
+document.getElementById('sclose').addEventListener('click',closeSheet);
+backdrop.addEventListener('click',closeSheet);
+document.addEventListener('keydown',ev=>{if(ev.key==='Escape')closeSheet();});
+
+// ================= 合成モード =================
+const VIEWS=['zukan','kigo','haichi','gousei','hanabi','semi'];
+function showView(v){
+  VIEWS.forEach(k=>{document.getElementById('view-'+k).hidden=k!==v;document.getElementById('tab-'+k).setAttribute('aria-selected',k===v);});
+}
+VIEWS.forEach(k=>document.getElementById('tab-'+k).addEventListener('click',()=>showView(k)));
+
+const EL=Object.fromEntries(E.map(e=>[e.sym,e]));
+const PARTS=[
+ {sym:'OH',label:'OH⁻',name:'水酸化物イオン',charge:-1,atoms:{O:1,H:1},mass:17},
+ {sym:'SO4',label:'SO₄²⁻',name:'硫酸イオン',charge:-2,atoms:{S:1,O:4},mass:96},
+ {sym:'NO3',label:'NO₃⁻',name:'硝酸イオン',charge:-1,atoms:{N:1,O:3},mass:62},
+ {sym:'CO3',label:'CO₃²⁻',name:'炭酸イオン',charge:-2,atoms:{C:1,O:3},mass:60},
+ {sym:'HCO3',label:'HCO₃⁻',name:'炭酸水素イオン',charge:-1,atoms:{H:1,C:1,O:3},mass:61},
+ {sym:'NH4',label:'NH₄⁺',name:'アンモニウムイオン',charge:1,atoms:{N:1,H:4},mass:18},
+];
+PARTS.forEach(x=>{x.part=true;x.kind='ion';EL[x.sym]=x;});
+const R=(f,fm,name,note,bonus=false)=>({f,fm,name,note,bonus});
+const RECIPES=[
+ R({H:2},'H₂','水素','いちばん軽い気体。燃えると酸素と結びついて水になる。'),
+ R({O:2},'O₂','酸素','手2本どうしが二重につながる。'),
+ R({N:2},'N₂','窒素','手3本どうしが三重につながる、とても丈夫な形。空気の約8割。'),
+ R({Cl:2},'Cl₂','塩素','プールの消毒のにおいのもと。'),
+ R({H:2,O:1},'H₂O','水','酸素の2本の手に水素が1つずつ。'),
+ R({C:1,O:2},'CO₂','二酸化炭素','炭素の4本の手が、酸素2つと二重ずつつながる。炭酸水の泡。'),
+ R({C:1,H:4},'CH₄','メタン','炭素の4本の手に水素が4つ。都市ガスの主成分。'),
+ R({N:1,H:3},'NH₃','アンモニア','窒素の3本の手に水素が3つ。'),
+ R({H:1,Cl:1},'HCl','塩化水素','水素と塩素は共有でつながっているが、塩素は電子を引っぱる力がとても強いので、共有している電子を自分の側に引き寄せている。水にとけると塩素が電子ごと持っていき、H⁺ と Cl⁻ に分かれる（塩酸）。NaH と比べてみよう。'),
+ R({Na:1,H:1},'NaH','水素化ナトリウム','塩化水素と逆のパターン。電子を引っぱる力が弱いナトリウムが相手だと、水素が電子を受け取って H⁻（ヘリウムと同じ満杯）になる。水とはげしく反応して水素を出す。'),
+ R({Li:1,H:1},'LiH','水素化リチウム','リチウムが電子をわたし、水素が受け取って H⁻ になる。水素をためる材料として研究されている。'),
+ R({Ca:1,H:2},'CaH₂','水素化カルシウム','カルシウムが電子を2個わたし、水素2つが1個ずつ受け取って H⁻ になる。水と反応して水素を出す。'),
+ R({H:2,S:1},'H₂S','硫化水素','温泉のたまごのようなにおい。酸素と同じ16族なので水と同じ形。'),
+ R({Na:1,Cl:1},'NaCl','塩化ナトリウム','食塩。'),
+ R({K:1,Cl:1},'KCl','塩化カリウム','減塩しおに使われる。'),
+ R({Mg:1,Cl:2},'MgCl₂','塩化マグネシウム','にがり。豆腐を固める。'),
+ R({Ca:1,Cl:2},'CaCl₂','塩化カルシウム','乾燥剤や、道路の雪をとかす薬。'),
+ R({Mg:1,O:1},'MgO','酸化マグネシウム','マグネシウムを燃やすとできる白い粉（中2の実験）。重さの比は Mg：O ＝ 24：16 ＝ 3：2。'),
+ R({Ca:1,O:1},'CaO','酸化カルシウム','生石灰。水をかけると熱くなる。'),
+ R({Al:2,O:3},'Al₂O₃','酸化アルミニウム','ルビーやサファイアの主成分。'),
+ R({Si:1,O:2},'SiO₂','二酸化ケイ素','水晶や砂。本物は原子がどこまでもつながった大きな網目。'),
+ R({Fe:1,S:1},'FeS','硫化鉄','鉄と硫黄を加熱するとできる黒い物質（中2の実験）。'),
+ R({Fe:1,O:1},'FeO','酸化鉄','鉄が酸素と結びつく。本物の赤さびは Fe₂O₃ で、そのとき鉄の手は3本（ルールが破れる例）。'),
+ R({Cu:1,O:1},'CuO','酸化銅','銅を加熱すると黒くなる（中2の実験）。重さの比は Cu：O ＝ 64：16 ＝ 4：1。'),
+ R({Ag:2,O:1},'Ag₂O','酸化銀','加熱すると銀と酸素に分かれる（中2の分解の実験）。'),
+ R({Cu:1,Cl:2},'CuCl₂','塩化銅','水溶液を電気分解すると、銅と塩素に分かれる（中3の実験）。'),
+ R({Zn:1,O:1},'ZnO','酸化亜鉛','日焼け止めやおしろいに使われる白い粉。'),
+ R({Ag:1,Cl:1},'AgCl','塩化銀','光に当たると黒くなる。昔の写真フィルムに使われた。'),
+ R({Ba:1,Cl:2},'BaCl₂','塩化バリウム','炎に入れると黄緑色に光る。'),
+ R({I:2},'I₂','ヨウ素','ヨウ素の原子は2つで1組になっている。塩素と同じ17族なので、つながり方も同じ。'),
+ R({K:1,I:1},'KI','ヨウ化カリウム','ヨウ素液は、ヨウ素をヨウ化カリウムの水溶液にとかして作る。'),
+ R({Na:1,O:1,H:1},'NaOH','水酸化ナトリウム','イオン結合と共有結合の両方をもつ。'),
+ R({Ba:1,S:1,O:4},'BaSO₄','硫酸バリウム','硫酸と水酸化バリウムを混ぜる（中和）とできる白い沈殿。水にとけず体に吸収されないので、胃の検査で飲む。'),
+ R({Ca:1,C:1,O:3},'CaCO₃','炭酸カルシウム','石灰石・貝がら・卵のからの成分。石灰水に二酸化炭素を通すと白くにごるのは、これができるから。'),
+ R({Na:1,H:1,C:1,O:3},'NaHCO₃','炭酸水素ナトリウム','重曹。加熱すると二酸化炭素が出るので、ホットケーキがふくらむ（中2の熱分解の実験）。'),
+ R({Na:2,C:1,O:3},'Na₂CO₃','炭酸ナトリウム','重曹を加熱したあとに残る白い粉。'),
+ R({Cu:1,S:1,O:4},'CuSO₄','硫酸銅','水にとかすと青い水溶液になる。電池や電気分解の実験で使う。'),
+ R({Zn:1,S:1,O:4},'ZnSO₄','硫酸亜鉛','ダニエル電池で、亜鉛板をひたす水溶液（中3）。'),
+ R({Mg:1,S:1,O:4},'MgSO₄','硫酸マグネシウム','入浴剤（エプソムソルト）に使われる。'),
+ R({N:1,H:4,Cl:1},'NH₄Cl','塩化アンモニウム','水酸化カルシウムとまぜて加熱すると、アンモニアが出る（中2の実験）。'),
+ R({N:2,H:8,S:1,O:4},'(NH₄)₂SO₄','硫酸アンモニウム','肥料（硫安）として使われる。'),
+ R({K:1,N:1,O:3},'KNO₃','硝酸カリウム','温度で水へのとけ方が大きく変わるので、再結晶の実験に使う（中1）。'),
+ R({Ag:1,N:1,O:3},'AgNO₃','硝酸銀','塩化物イオンと出会うと白い沈殿（塩化銀）ができるので、Cl⁻ があるか調べるのに使う。'),
+ R({Ca:1,O:2,H:2},'Ca(OH)₂','水酸化カルシウム','水にとかしたものが石灰水。'),
+ R({Ba:1,O:2,H:2},'Ba(OH)₂','水酸化バリウム','硫酸と中和すると、白い硫酸バリウムの沈殿ができる。'),
+ R({H:2,S:1,O:4},'H₂SO₄','硫酸','水にとけると 2H⁺ と SO₄²⁻ に分かれる、強い酸。'),
+ R({H:1,N:1,O:3},'HNO₃','硝酸','水にとけると H⁺ と NO₃⁻ に分かれる酸。'),
+ R({H:2,O:2},'H₂O₂','過酸化水素','消毒液（オキシドール）。酸素どうしもつながっている。',true),
+ R({C:2,H:6},'C₂H₆','エタン','炭素どうしが手をつなぐと、物質の種類が一気に増える。',true),
+ R({C:2,H:6,O:1},'C₂H₆O','エタノール','お酒のアルコール。',true),
+];
+const rkey=f=>Object.keys(f).sort().map(k=>k+f[k]).join('');
+const RMAP=Object.fromEntries(RECIPES.map(r=>[rkey(r.f),r]));
+let made=new Set();
+try{made=new Set(JSON.parse(localStorage.getItem('gousei-made')||'[]'));}catch(_){}
+function saveMade(){try{localStorage.setItem('gousei-made',JSON.stringify([...made]));}catch(_){}}
+
+const G={atoms:[],bonds:[],sel:null,nextId:1,lastDone:null};
+const bench=document.getElementById('bench'), gstatus=document.getElementById('gstatus');
+const isMetal=e=>e.kind==='metal';
+const isPlusSide=e=>isMetal(e)||(e.part&&e.charge>0);
+const used=id=>G.bonds.reduce((s,b)=>s+((b.a===id||b.b===id)?b.n:0),0);
+const atomById=id=>G.atoms.find(a=>a.id===id);
+const free=a=>hands(EL[a.sym])-used(a.id);
+function say(t,warn=false){gstatus.textContent=t; gstatus.classList.toggle('warn',warn);}
+
+// 原子パレット（なかまごとに切りかえ）
+const pal=document.getElementById('palette');
+const PGROUPS=[
+ {k:'a',t:'1〜20番',items:E.filter(e=>e.z<=20)},
+ {k:'b',t:'よく出る10元素',items:E.filter(e=>e.z>20)},
+ {k:'c',t:'かたまりイオン',items:PARTS},
+];
+let palK='a';
+function renderPal(){
+  document.getElementById('palseg').innerHTML=PGROUPS.map(g=>`<button class="tool" data-k="${g.k}" aria-pressed="${g.k===palK}">${g.t}</button>`).join('');
+  document.querySelectorAll('#palseg .tool').forEach(b=>b.addEventListener('click',()=>{palK=b.dataset.k;renderPal();}));
+  const g=PGROUPS.find(x=>x.k===palK);
+  pal.innerHTML='';
+  g.items.forEach(x=>{
+    const b=document.createElement('button'); b.className='pbtn'+(x.part?' part':'');
+    b.setAttribute('aria-label',x.name+'を置く');
+    b.innerHTML=(x.part?partSVG(x,hands(x),false):charSVG(x))+`<span>${x.part?x.label:x.sym}</span>`;
+    b.addEventListener('click',()=>addAtom(x.sym));
+    pal.appendChild(b);
+  });
+  document.getElementById('parthint').hidden=palK!=='c';
+}
+function addAtom(sym){
+  if(G.atoms.length>=14){say('台がいっぱい。いらない原子を消してから置こう。',true);return;}
+  let x=180,y=145;
+  for(let t=0;t<40;t++){
+    const cx=40+Math.random()*280, cy=40+Math.random()*210;
+    if(G.atoms.every(a=>Math.hypot(a.x-cx,a.y-cy)>62)){x=cx;y=cy;break;}
+    x=cx;y=cy;
+  }
+  G.atoms.push({id:G.nextId++,sym,x,y});
+  const e=EL[sym];
+  if(e.part) say(`${e.name}（${e.label}）を置いた。原子のかたまり全体で電子が${Math.abs(e.charge)}個${e.charge<0?'多い':'少ない'}ので、手は${hands(e)}本。`);
+  else if(e.group===18) say(`${e.name}は手が0本。外側が満杯なので、だれともつながらない。`);
+  else say(`${e.name}を置いた。手は${hands(e)}本。`);
+  render();
+}
+function bondRule(A,B){
+  const a=EL[A.sym], b=EL[B.sym];
+  if(a.shy||b.shy) return {ok:false,msg:'金は電子をなかなか手放さない。だからほとんどだれともつながらず、さびない。'};
+  if(isMetal(a)&&isMetal(b)) return {ok:false,msg:'金属の赤い手どうしはつながれない。どちらも電子を手放したい側だから。'};
+  if(a.part||b.part){
+    const P=a.part?a:b, O=P===a?b:a;
+    if(O.part) return P.charge*O.charge<0?{ok:true,kind:'ionic'}:{ok:false,msg:'同じ符号のかたまりイオンどうしは、反発してつながらない。'};
+    if(isMetal(O)) return P.charge<0?{ok:true,kind:'ionic'}:{ok:false,msg:'アンモニウムイオンも金属も＋なので、つながらない。'};
+    if(P.charge<0){ if(O.z===1) return {ok:true,kind:'covalent',acid:true}; return {ok:false,msg:'−のかたまりイオンは、＋の相手（金属、水素、アンモニウムイオン）とくっつく。'}; }
+    if(handType(O)==='minus') return {ok:true,kind:'ionic'};
+    return {ok:false,msg:'アンモニウムイオン（＋）は、−の相手とくっつく。'};
+  }
+  if(isMetal(a)||isMetal(b)){
+    const other=isMetal(a)?b:a;
+    if(other.z===1) return {ok:true,kind:'ionic',hydride:true};
+    if(handType(other)!=='minus') return {ok:false,msg:'金属の赤い手は、電子を受け取る青い手（または水素）としかつながれない。'};
+    return {ok:true,kind:'ionic'};
+  }
+  return {ok:true,kind:'covalent'};
+}
+function tapAtom(id){
+  const A=atomById(id), e=EL[A.sym];
+  if(G.sel===null){
+    if(hands(e)===0){say(`${e.name}は希ガス。手がないので、だれともつながらない。`);return;}
+    if(free(A)===0){say(`${e.name}の手はもう全部つながっている。線をタップするとはずせる。`);return;}
+    G.sel=id; say(`${e.name}をえらんだ（あいている手 ${free(A)}本）。つなぎたい相手をタップ。`); render(); return;
+  }
+  if(G.sel===id){G.sel=null; say('えらぶのをやめた。'); render(); return;}
+  const S=atomById(G.sel);
+  if(hands(e)===0){say(`${e.name}は手がないので、つながらない。`,true);return;}
+  if(free(A)===0){say(`${e.name}の手はもうあいていない。`,true);return;}
+  const rule=bondRule(S,A);
+  if(!rule.ok){say(rule.msg,true);return;}
+  let b=G.bonds.find(x=>(x.a===S.id&&x.b===A.id)||(x.a===A.id&&x.b===S.id));
+  if(b&&b.n>=3){say('同じ相手とは3本までしかつながれない。',true);return;}
+  if(b) b.n++; else G.bonds.push(b={a:S.id,b:A.id,n:1,kind:rule.kind});
+  const kindTxt=rule.acid?'水素とつながって酸になる（水にとけると H⁺ が出る）':rule.hydride?'イオン結合。水素が電子を受け取って H⁻ になる（塩化水素と逆のパターン）':rule.kind==='ionic'?'イオン結合（電子をわたす）':'共有結合（電子を出し合う）';
+  say(`${EL[S.sym].name}と${e.name}が${b.n>1?b.n+'本で':''}つながった：${kindTxt}`);
+  if(free(S)===0) G.sel=null;
+  render();
+}
+function removeBond(i){
+  const b=G.bonds[i]; b.n--; if(b.n<=0) G.bonds.splice(i,1);
+  say('線を1本はずした。'); render();
+}
+document.getElementById('gdel').addEventListener('click',()=>{
+  if(G.sel===null) return;
+  const id=G.sel; G.atoms=G.atoms.filter(a=>a.id!==id); G.bonds=G.bonds.filter(b=>b.a!==id&&b.b!==id);
+  G.sel=null; say('原子を消した。'); render();
+});
+document.getElementById('gclear').addEventListener('click',()=>{
+  G.atoms=[];G.bonds=[];G.sel=null;G.lastDone=null; say('台を片づけた。'); render();
+});
+
+// ドラッグとタップ
+let drag=null;
+function svgPt(ev){const p=bench.createSVGPoint();p.x=ev.clientX;p.y=ev.clientY;return p.matrixTransform(bench.getScreenCTM().inverse());}
+bench.addEventListener('pointerdown',ev=>{
+  const at=ev.target.closest('[data-atom]'), bd=ev.target.closest('[data-bond]');
+  const p=svgPt(ev);
+  drag={atom:at?+at.dataset.atom:null,bond:bd?+bd.dataset.bond:null,sx:p.x,sy:p.y,moved:false};
+  bench.setPointerCapture(ev.pointerId);
+});
+bench.addEventListener('pointermove',ev=>{
+  if(!drag||drag.atom===null) return;
+  const p=svgPt(ev);
+  if(!drag.moved&&Math.hypot(p.x-drag.sx,p.y-drag.sy)<6) return;
+  drag.moved=true;
+  const A=atomById(drag.atom); A.x=Math.max(24,Math.min(336,p.x)); A.y=Math.max(24,Math.min(266,p.y));
+  render(false);
+});
+bench.addEventListener('pointerup',()=>{
+  if(!drag) return;
+  if(!drag.moved){ if(drag.atom!==null) tapAtom(drag.atom); else if(drag.bond!==null) removeBond(drag.bond); }
+  else render();
+  drag=null;
+});
+
+// つながりのかたまりを調べる
+function components(){
+  const seen=new Set(), out=[];
+  for(const a of G.atoms){
+    if(seen.has(a.id)) continue;
+    const comp=[], st=[a.id]; seen.add(a.id);
+    while(st.length){const id=st.pop(); comp.push(id);
+      G.bonds.forEach(b=>{const o=b.a===id?b.b:b.b===id?b.a:null; if(o!==null&&!seen.has(o)){seen.add(o);st.push(o);}});}
+    out.push(comp);
+  }
+  return out;
+}
+const SUP=['','','²','³'];
+function ion(e){const n=hands(e);return e.sym+SUP[n]+(handType(e)==='plus'?'⁺':'⁻');}
+
+function render(full=true){
+  const doneIds=new Set(); let found=[];
+  for(const comp of components()){
+    if(comp.length<2) continue;
+    const atoms=comp.map(atomById);
+    if(atoms.some(a=>free(a)!==0)) continue;
+    comp.forEach(id=>doneIds.add(id));
+    found.push(atoms);
+  }
+  // 線
+  let h='';
+  G.bonds.forEach((b,i)=>{
+    const A=atomById(b.a), B=atomById(b.b);
+    const dx=B.x-A.x, dy=B.y-A.y, L=Math.hypot(dx,dy)||1, nx=-dy/L, ny=dx/L;
+    let g=`<g data-bond="${i}" style="cursor:pointer"><line x1="${A.x}" y1="${A.y}" x2="${B.x}" y2="${B.y}" stroke="transparent" stroke-width="18"/>`;
+    for(let k=0;k<b.n;k++){
+      const off=(k-(b.n-1)/2)*6, ox=nx*off, oy=ny*off;
+      if(b.kind==='ionic'){
+        g+=`<line x1="${A.x+ox}" y1="${A.y+oy}" x2="${B.x+ox}" y2="${B.y+oy}" stroke="currentColor" stroke-width="2.2" stroke-dasharray="5 4" stroke-linecap="round"/>`;
+        const minus=isPlusSide(EL[A.sym])?B:A, plus=minus===A?B:A;
+        const t=0.72, ex=plus.x+(minus.x-plus.x)*t+ox, ey=plus.y+(minus.y-plus.y)*t+oy;
+        if(!EL[A.sym].part&&!EL[B.sym].part) g+=`<circle cx="${ex}" cy="${ey}" r="3.2" fill="#FFC21A" stroke="${INK}" stroke-width="1"/>`;
+      }else{
+        g+=`<line x1="${A.x+ox}" y1="${A.y+oy}" x2="${B.x+ox}" y2="${B.y+oy}" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>`;
+        const mx=(A.x+B.x)/2+ox, my=(A.y+B.y)/2+oy, ux=dx/L*3.6, uy=dy/L*3.6;
+        g+=`<circle cx="${mx-ux}" cy="${my-uy}" r="2.6" fill="#FFC21A" stroke="${INK}" stroke-width="1"/><circle cx="${mx+ux}" cy="${my+uy}" r="2.6" fill="#FFC21A" stroke="${INK}" stroke-width="1"/>`;
+      }
+    }
+    h+=g+'</g>';
+  });
+  // 原子
+  G.atoms.forEach(a=>{
+    const e=EL[a.sym], fr=free(a), happy=hands(e)>0&&fr===0;
+    const sel=G.sel===a.id;
+    h+=`<g data-atom="${a.id}" style="cursor:grab">`+
+      (sel?`<circle cx="${a.x}" cy="${a.y}" r="31" fill="none" stroke="var(--accent)" stroke-width="3" stroke-dasharray="6 4"/>`:'')+
+      (doneIds.has(a.id)?`<circle cx="${a.x}" cy="${a.y}" r="27" fill="var(--accent)" opacity=".12"/>`:'')+
+      `<svg x="${a.x-32}" y="${a.y-32}" width="64" height="64" viewBox="0 0 100 100" overflow="visible">`+
+      (e.part?partSVG(e,fr,happy):charSVG(e,{handsN:fr,happy})).replace(/^<svg[^>]*>/,'').replace(/<\/svg>$/,'')+
+      `</svg><text x="${a.x}" y="${a.y+30}" text-anchor="middle" font-size="12" font-weight="800" fill="currentColor">${e.label||e.sym}</text></g>`;
+  });
+  if(!G.atoms.length) h=`<text x="180" y="150" text-anchor="middle" font-size="13" fill="currentColor" opacity=".5">下のパレットから原子を置こう</text>`;
+  bench.innerHTML=h;
+  document.getElementById('gdel').disabled=G.sel===null;
+  if(!full) return;
+  // 完成判定
+  const res=document.getElementById('gresult');
+  res.innerHTML=found.map(resultCard).join('');
+  found.forEach(atoms=>{
+    const r=RMAP[rkey(countOf(atoms))];
+    if(r&&!made.has(r.fm)){made.add(r.fm);saveMade();say(`完成！ ${r.name}（${r.fm}）を物質図鑑に登録した。`);}
+  });
+  renderColl();
+}
+function partSVG(e,handsN,happy){
+  const fill=e.charge<0?'#BFD7FF':'#FFC9B8', H=HAND[e.charge<0?'minus':'plus'];
+  let arms='';
+  (ARM_ANGLES[handsN]||[]).forEach(d=>{const a=d*Math.PI/180, x1=50+26*Math.cos(a), y1=50+14*Math.sin(a), x2=50+46*Math.cos(a), y2=50+34*Math.sin(a);
+    arms+=`<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${INK}" stroke-width="2.6" stroke-linecap="round"/><circle cx="${x2.toFixed(1)}" cy="${y2.toFixed(1)}" r="5" fill="${H.color}" stroke="${INK}" stroke-width="1.8"/>${sign(H.sign,x2,y2)}`;});
+  const ey=42, eyes=happy?[-1,1].map(s=>`<path d="M${50+s*9-3} ${ey+1} Q${50+s*9} ${ey-3} ${50+s*9+3} ${ey+1}" fill="none" stroke="${INK}" stroke-width="1.8" stroke-linecap="round"/>`).join(''):[-1,1].map(s=>`<circle cx="${50+s*9}" cy="${ey}" r="2.2" fill="${INK}"/>`).join('');
+  const t=e.label.replace(/[⁺⁻²]/g,'');
+  return `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">${arms}<rect x="16" y="33" width="68" height="36" rx="18" fill="${fill}" stroke="${INK}" stroke-width="2.4"/>${eyes}<text x="50" y="62" text-anchor="middle" font-size="13" font-weight="800" fill="${INK}">${t}</text></svg>`;
+}
+function countOf(atoms){const c={};atoms.forEach(a=>{const e=EL[a.sym];if(e.part)Object.entries(e.atoms).forEach(([k,v])=>c[k]=(c[k]||0)+v);else c[a.sym]=(c[a.sym]||0)+1;});return c;}
+function resultCard(atoms){
+  const c=countOf(atoms), r=RMAP[rkey(c)];
+  const ids=new Set(atoms.map(a=>a.id));
+  const kinds=new Set(G.bonds.filter(b=>ids.has(b.a)).map(b=>b.kind));
+  const kindLabel=kinds.size===2?'イオン結合＋共有結合':kinds.has('ionic')?'イオン結合':'共有結合';
+  let why='';
+  if(kinds.has('ionic')){
+    const ib=G.bonds.filter(b=>ids.has(b.a)&&b.kind==='ionic');
+    const side=f=>[...new Set(ib.flatMap(b=>[atomById(b.a),atomById(b.b)]).map(a=>a.sym).filter(f))];
+    const metals=side(s=>isPlusSide(EL[s])), nons=side(s=>!isPlusSide(EL[s]));
+    const ionCount=sym=>{const at=atoms.find(x=>x.sym===sym);return G.bonds.filter(b=>b.kind==='ionic'&&(b.a===at.id||b.b===at.id)).reduce((t,b)=>t+b.n,0);};
+    why+=metals.map(s=>EL[s].part?`かたまりの ${EL[s].label}（${EL[s].name}）`:`${EL[s].name}は電子を${hands(EL[s])}個わたして ${ion(EL[s])}`).join('、')+'。'+
+      nons.map(s=>{const k=ionCount(s), e=EL[s]; if(e.part) return `かたまりの ${e.label}（${e.name}）`;
+        return k<hands(e)?`${e.name}は${k}個受け取り、残りの手は共有でつながる（${s==='O'&&c.H?'OH⁻':'かたまり'}のイオンになる）`:`${e.name}は${k}個受け取って ${ion(e)}`;}).join('、')+'。＋と−が引き合ってくっつく。';
+  }
+  if(kinds.has('covalent')) why+=(why?'':'')+'電子を出し合って共有し（線の上の黄色い2つの点）、みんな外側の部屋が満杯になる。';
+  const masses=atoms.map(a=>EL[a.sym].mass), total=Math.round(masses.reduce((x,y)=>x+y,0)*10)/10;
+  const order=Object.keys(c);
+  const massExpr=order.map(s=>c[s]>1?`${EL[s].mass}×${c[s]}`:`${EL[s].mass}`).join('＋');
+  const fm=r?r.fm:order.map(s=>s+(c[s]>1?String(c[s]).replace(/\d/g,d=>'₀₁₂₃₄₅₆₇₈₉'[d]):'')).join('');
+  const title=r?`${r.fm}<small>${r.name}${r.bonus?'（ボーナス）':''}</small>`:`${fm}<small>図鑑にない物質</small>`;
+  return `<div class="result"><div class="rname">${title}</div><span class="kind">${kindLabel}</span>
+    <p>${why}</p>${r?`<p>${r.note}</p>`:'<p>手は全部つながった。この組み合わせは図鑑にはまだないけれど、実在する物質かもしれない。</p>'}
+    ${balanceSVG(massExpr,fm,total)}
+    <p>材料の重さの合計と、できた物質の重さは同じ（質量保存の法則）。</p></div>`;
+}
+function balanceSVG(expr,fm,total){
+  return `<svg class="balance" viewBox="0 0 320 110" role="img" aria-label="天秤：材料${total}とできた物質${total}がつり合う">
+   <polygon points="160,58 146,96 174,96" fill="var(--muted)"/>
+   <rect x="120" y="96" width="80" height="6" rx="3" fill="var(--muted)"/>
+   <line x1="40" y1="58" x2="280" y2="58" stroke="var(--ink)" stroke-width="3" stroke-linecap="round"/>
+   <line x1="60" y1="58" x2="60" y2="70" stroke="var(--ink)" stroke-width="1.5"/><line x1="260" y1="58" x2="260" y2="70" stroke="var(--ink)" stroke-width="1.5"/>
+   <path d="M20 70 Q60 88 100 70 Z" fill="var(--bg)" stroke="var(--ink)" stroke-width="1.5"/>
+   <path d="M220 70 Q260 88 300 70 Z" fill="var(--bg)" stroke="var(--ink)" stroke-width="1.5"/>
+   <text x="60" y="22" text-anchor="middle" font-size="11" fill="var(--muted)">材料</text>
+   <text x="60" y="42" text-anchor="middle" font-size="12" font-weight="800" fill="var(--ink)">${expr}</text>
+   <text x="260" y="22" text-anchor="middle" font-size="11" fill="var(--muted)">できた物質</text>
+   <text x="260" y="42" text-anchor="middle" font-size="12" font-weight="800" fill="var(--ink)">${fm} ＝ ${total}</text>
+  </svg>`;
+}
+function renderColl(){
+  const main=RECIPES.filter(r=>!r.bonus), bonus=RECIPES.filter(r=>r.bonus);
+  const n=main.filter(r=>made.has(r.fm)).length;
+  const nb=bonus.filter(r=>made.has(r.fm)).length;
+  document.getElementById('gcount').textContent=`${main.length}種のうち ${n}種を作った`+(nb?`（ボーナス ${nb}種）`:'');
+  document.getElementById('gcoll').innerHTML=RECIPES.filter(r=>!r.bonus||made.has(r.fm)).map(r=>
+    made.has(r.fm)?`<div class="slot made"><b>${r.fm}</b>${r.name}</div>`:`<div class="slot"><b>？</b>${r.name}</div>`).join('');
+}
+renderPal();
+render();
+
+// ================= 電子配置パズル =================
+const SHELL=['K','L','M','N'], CAP=[2,8,8,2];
+const HR=[46,78,110,142].map(x=>x*0.98);
+const H={el:null,placed:[0,0,0,0],step:'place',tries:0};
+let cleared=new Set();
+try{cleared=new Set(JSON.parse(localStorage.getItem('haichi-cleared')||'[]'));}catch(_){}
+function saveCleared(){try{localStorage.setItem('haichi-cleared',JSON.stringify([...cleared]));}catch(_){}}
+const PUZ=E.filter(e=>e.z<=20);
+const hatom=document.getElementById('hatom'), hstatus=document.getElementById('hstatus'), hquiz=document.getElementById('hquiz');
+function hsay(t,warn=false){hstatus.textContent=t;hstatus.classList.toggle('warn',warn);}
+const total=()=>H.placed.reduce((a,b)=>a+b,0);
+const nShells=e=>e.shells.length;
+
+function renderPick(){
+  const box=document.getElementById('hpick');
+  box.innerHTML=PUZ.map(e=>`<button class="hp${cleared.has(e.sym)?' cleared':''}" data-sym="${e.sym}" aria-pressed="${H.el===e}">${e.sym}<small>${e.z}</small></button>`).join('');
+  box.querySelectorAll('.hp').forEach(b=>b.addEventListener('click',()=>startH(EL[b.dataset.sym])));
+}
+function startH(e){
+  H.el=e; H.placed=[0,0,0,0]; H.step='place'; H.tries=0;
+  hsay(`${e.name}（原子番号${e.z}）。電子を${e.z}個入れよう。部屋をタップするか、下のボタンで入れる。`);
+  renderH(); renderPick();
+}
+function placeIn(i){
+  const e=H.el; if(H.step!=='place') return;
+  if(total()>=e.z){hsay(`電子はもう${e.z}個全部入っている。`,true);return;}
+  if(H.placed[i]>=CAP[i]){
+    hsay(i===2?`M殻は、中学のルールでは8個でいっぱい。つぎの電子はN殻へ。`:`${SHELL[i]}殻の定員は${CAP[i]}個。もう入らない。`,true);return;
+  }
+  for(let j=0;j<i;j++) if(H.placed[j]<CAP[j]){hsay(`まだ内側の${SHELL[j]}殻があいている。電子は原子核に近い内側の部屋から順に入る（内側ほど引きつけられて安定するから）。`,true);return;}
+  H.placed[i]++;
+  const left=e.z-total();
+  if(left>0){hsay(`${SHELL[i]}殻に入れた（${H.placed[i]}/${CAP[i]}）。あと${left}個。`);}
+  else{
+    H.step='dir';
+    const v=H.placed[nShells(e)-1];
+    hsay(`全部入った！ 電子配置は ${H.placed.slice(0,nShells(e)).join('・')}。いちばん外側の${SHELL[nShells(e)-1]}殻には${v}個。`);
+  }
+  renderH();
+}
+function undoH(){
+  if(H.step==='done') return;
+  for(let i=3;i>=0;i--) if(H.placed[i]>0){H.placed[i]--;break;}
+  H.step='place'; hsay(`1つもどした。あと${H.el.z-total()}個。`); renderH();
+}
+const DIRS={plus:'手放したい',minus:'受け取りたい',both:'どちらとも言えない',full:'もう満杯'};
+function correctDir(e){return e.group===18?'full':handType(e);}
+function answerDir(d){
+  const e=H.el, v=valence(e), ok=d===correctDir(e);
+  if(!ok){
+    let hint;
+    if(e.group===18) hint=`外側の部屋は${v}個で満杯。もう何もしなくていい。`;
+    else if(e.z===1) hint='水素の部屋（K殻）の定員は2個で、電子は1個。手放すなら1個、受け取るなら1個。同じ数なら？';
+    else hint=`外側の電子は${v}個。手放すなら${v}個、受け取るなら${8-v}個動かす。少ない方が近道（ルール3）。同じ数ならどちらとも言えない。`;
+    hsay(`ちがうみたい。ヒント：${hint}`,true); return;
+  }
+  if(d==='full'){finishH();return;}
+  H.step='hands'; hsay(`正解！ ${DIRS[d]}側。`); renderH();
+}
+function answerHands(n){
+  const e=H.el, v=valence(e);
+  if(n!==hands(e)){
+    const t=handType(e);
+    const hint=e.z===1?'手放す電子は1個。':t==='plus'?`外側の電子${v}個を全部手放すと、内側の満杯の部屋が一番外になる。`:t==='minus'?`外側の電子は${v}個。満杯の8個まであと何個？`:`外側の電子${v}個を1個ずつ出して、相手と共有する。`;
+    hsay(`ちがうみたい。ヒント：${hint}`,true); return;
+  }
+  finishH();
+}
+function finishH(){
+  H.step='done'; cleared.add(H.el.sym); saveCleared(); renderH(); renderPick();
+  hsay(`${H.el.name}のキャラが完成した！`);
+}
+function renderH(){
+  const e=H.el, ns=nShells(e), outer=ns-1;
+  let h='';
+  for(let i=ns-1;i>=0;i--){
+    const r=HR[i], hl=(H.step==='dir'||H.step==='hands')&&i===outer;
+    h+=`<g data-shell="${i}" style="cursor:pointer"><circle cx="160" cy="160" r="${r}" fill="none" stroke="transparent" stroke-width="28"/>
+      <circle cx="160" cy="160" r="${r}" fill="none" stroke="${hl?'var(--accent)':'currentColor'}" stroke-opacity="${hl?1:.35}" stroke-width="${hl?3:1.6}" stroke-dasharray="${hl?'':'3 4'}"/></g>`;
+    h+=`<text x="${(160+r*0.383+9).toFixed(1)}" y="${(160-r*0.924+4).toFixed(1)}" font-size="11" font-weight="800" fill="currentColor" opacity=".7">${SHELL[i]} ${H.placed[i]}/${CAP[i]}</text>`;
+    const n=H.placed[i];
+    for(let k=0;k<n;k++){
+      const a=(-90+360*k/Math.max(n,1))*Math.PI/180;
+      h+=`<circle cx="${(160+r*Math.cos(a)).toFixed(1)}" cy="${(160+r*Math.sin(a)).toFixed(1)}" r="6" fill="#FFC21A" stroke="${INK}" stroke-width="1.4" pointer-events="none"/>`;
+    }
+  }
+  h+=`<circle cx="160" cy="160" r="22" fill="${color(e)}" stroke="${INK}" stroke-width="2.4"/><text x="160" y="157" text-anchor="middle" font-size="13" font-weight="800" fill="${INK}">+${e.z}</text><text x="160" y="171" text-anchor="middle" font-size="8" fill="${INK}">原子核</text>`;
+  h+=`<text x="12" y="22" font-size="15" font-weight="800" fill="currentColor">${e.sym} ${e.name}</text><text x="12" y="40" font-size="11" fill="currentColor" opacity=".7">電子 ${total()}/${e.z}個</text>`;
+  hatom.innerHTML=h;
+  // shell buttons
+  const sb=document.getElementById('hshellbtns');
+  sb.innerHTML=H.step==='place'?SHELL.slice(0,ns).map((k,i)=>`<button class="btn" data-i="${i}">${k}殻に入れる</button>`).join(''):'';
+  sb.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>placeIn(+b.dataset.i)));
+  // quiz
+  if(H.step==='dir'){
+    hquiz.innerHTML=`<div class="qbox"><div class="q">外側の電子は${H.placed[outer]}個。満杯になるための近道は？</div><div class="row">
+      <button class="opt red" data-d="plus">＋ 手放したい</button>
+      <button class="opt blue" data-d="minus">− 受け取りたい</button>
+      <button class="opt purple" data-d="both">± どちらとも言えない</button>
+      <button class="opt" data-d="full">もう満杯</button></div></div>`;
+    hquiz.querySelectorAll('.opt').forEach(b=>b.addEventListener('click',()=>answerDir(b.dataset.d)));
+  }else if(H.step==='hands'){
+    const t=handType(e), q=t==='plus'?'手放す電子は何個？':t==='minus'?'受け取る電子は何個？':'共有に出す電子は何個？';
+    hquiz.innerHTML=`<div class="qbox"><div class="q">${q}（その数が手の数になる）</div><div class="row">${[1,2,3,4].map(n=>`<button class="opt" data-n="${n}">${n}個</button>`).join('')}</div></div>`;
+    hquiz.querySelectorAll('.opt').forEach(b=>b.addEventListener('click',()=>answerHands(+b.dataset.n)));
+  }else if(H.step==='done'){
+    const same=PUZ.filter(x=>x.group===e.group&&x!==e&&cleared.has(x.sym));
+    const cmp=e.z===1?'水素は1族の列にいるけれど金属ではない、特別な元素。アルカリ金属とちがって紫の手をもつ。':same.length?`同じ${e.group}族の${same.map(x=>x.name).join('・')}も、外側の電子は${valence(e)}個。だから同じ形・同じ手になる。`:`同じ${e.group}族の元素もクリアすると、外側の電子の数がそろっていることがわかる。`;
+    hquiz.innerHTML=`<div class="done">${charSVG(e)}<div><b>${e.sym} ${e.name}</b><p>${handsReason(e)}。</p><p>${cmp}</p></div></div>`;
+  }else hquiz.innerHTML='';
+}
+// ---- ルール編 ----
+function miniAtom(cx,cy,counts,fill,opts={}){
+  const R=[15,26,37,48];
+  let h='';
+  counts.forEach((n,i)=>{
+    h+=`<circle cx="${cx}" cy="${cy}" r="${R[i]}" fill="none" stroke="currentColor" stroke-opacity=".35" stroke-dasharray="2 3"/>`;
+    for(let k=0;k<n;k++){const a=(-90+360*k/n)*Math.PI/180;
+      const ghost=opts.ghost&&opts.ghost.shell===i&&k>=n-opts.ghost.n;
+      h+=`<circle cx="${(cx+R[i]*Math.cos(a)).toFixed(1)}" cy="${(cy+R[i]*Math.sin(a)).toFixed(1)}" r="3.6" fill="${ghost?'none':'#FFC21A'}" stroke="${ghost?(opts.ghost.color||'#3D8BFF'):INK}" stroke-width="${ghost?1.8:1}" ${ghost?'stroke-dasharray="2 1.5"':''}/>`;}
+  });
+  h+=`<circle cx="${cx}" cy="${cy}" r="8" fill="${fill}" stroke="${INK}" stroke-width="1.5"/>`;
+  return h;
+}
+const LESSONS=[
+ {t:'ルール1：原子は外側の部屋を満杯にしたい',
+  b:()=>`<p>希ガス（ヘリウム・ネオン・アルゴン）は、外側の部屋が電子で満杯。だから安定していて、だれともつながらない。</p>
+   <svg viewBox="0 0 320 130">${miniAtom(80,62,[2],'#C7B6FF')}${miniAtom(240,62,[2,8],'#C7B6FF')}
+   <text x="80" y="124" text-anchor="middle" font-size="12" font-weight="800" fill="currentColor">He 2（満杯）</text>
+   <text x="240" y="124" text-anchor="middle" font-size="12" font-weight="800" fill="currentColor">Ne 2・8（満杯）</text></svg>
+   <p>ほかの原子も、希ガスと同じ「外側が満杯」の形になりたがる。これがすべてのスタート。</p>`},
+ {t:'ルール2：満杯にする方法は2つ',
+  b:()=>`<p><b>方法A：外側の電子を手放す。</b>ナトリウムは外側の1個を手放すと、内側の満杯の部屋（8個）が一番外になる。</p>
+   <svg viewBox="0 0 320 120">${miniAtom(70,58,[2,8,1],'#F5B400',{ghost:{shell:2,n:1,color:'#FF6B4A'}})}
+   <text x="160" y="62" text-anchor="middle" font-size="12" font-weight="800" fill="#FF6B4A">1個手放す →</text>
+   ${miniAtom(250,58,[2,8],'#F5B400')}
+   <text x="70" y="116" text-anchor="middle" font-size="11" fill="currentColor">Na 2・8・1</text><text x="250" y="116" text-anchor="middle" font-size="11" fill="currentColor">Na⁺ 2・8（Neと同じ形）</text></svg>
+   <p><b>方法B：足りない電子を受け取る。</b>塩素は外側が7個。1個受け取れば8個で満杯。</p>
+   <svg viewBox="0 0 320 120">${miniAtom(70,58,[2,8,7],'#79D6A6')}
+   <text x="160" y="62" text-anchor="middle" font-size="12" font-weight="800" fill="#3D8BFF">1個受け取る →</text>
+   ${miniAtom(250,58,[2,8,8],'#79D6A6',{ghost:{shell:2,n:1,color:'#3D8BFF'}})}
+   <text x="70" y="116" text-anchor="middle" font-size="11" fill="currentColor">Cl 2・8・7</text><text x="250" y="116" text-anchor="middle" font-size="11" fill="currentColor">Cl⁻ 2・8・8（Arと同じ形）</text></svg>
+   <p>手放すと電子（−）が減るので＋、受け取ると増えるので−のイオンになる。</p>`},
+ {t:'ルール3：動かす電子が少ない方が、その原子のなりたい向き',
+  b:()=>`<p>外側の電子の数を選んでみよう。満杯にするのに、手放すのと受け取るのでは、どちらが少なくてすむ？</p>
+   <div class="ruler" id="ruler">${[1,2,3,4,5,6,7,8].map(n=>`<button data-n="${n}" aria-pressed="false">${n}</button>`).join('')}</div>
+   <div id="rulerOut"><p style="color:var(--muted)">数字をタップ</p></div>
+   <p>少ない方がその原子の「なりたい向き」。これで手の色（赤・青・紫）と手の数が決まる。</p>`,
+  init:()=>{const box=document.getElementById('ruler');box.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{
+    box.querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',x===b));rulerShow(+b.dataset.n);}));}},
+ {t:'なぜ少ない方を選ぶの？（理由）',
+  b:()=>`<p>電子は−、原子核は＋なので、電子は原子核に引っぱられている。電子を取り外すには、この引っぱりに逆らう<b>エネルギー</b>がいる。</p>
+   <svg viewBox="0 0 320 150">
+    ${[1,2,3,4].map((k,i)=>{const h=[22,42,70,108][i];return `<rect x="${40+i*66}" y="${126-h}" width="44" height="${h}" rx="6" fill="#FF6B4A" opacity="${0.45+i*0.17}"/><text x="${62+i*66}" y="143" text-anchor="middle" font-size="11" fill="currentColor">${k}個目</text>`;}).join('')}
+    <text x="12" y="16" font-size="11" fill="currentColor" opacity=".75">取り外すのに必要なエネルギー（イメージ）</text></svg>
+   <p>1個取り外すと原子全体が＋にかたむき、残りの電子はもっと強く引っぱられる。だから2個目、3個目と、必要なエネルギーがどんどん大きくなる。</p>
+   <p>受け取るときも同じで、入ってくる電子は、すでにいる電子（−どうし）に押し返される。たくさん入れるほど、押し返しに逆らうエネルギーが大きくなる。</p>
+   <p>だから原子は、必要なエネルギーが少なくてすむ方、つまり動かす電子が少ない方に向かう。</p>`},
+ {t:'ルール4：つながり方は、相手との組み合わせで決まる',
+  b:()=>`<p><b>手放したい原子と、受け取りたい原子が出会うと</b>、電子がわたされて＋と−のイオンになり、引き合ってくっつく。これが<b>イオン結合</b>（例：NaCl）。</p>
+   <p><b>受け取りたい原子どうしが出会うと</b>、どちらも手放さないので、電子を1個ずつ出し合い、その2個を「両方のもの」として数える。これが<b>共有結合</b>。</p>
+   <svg viewBox="0 0 320 130">
+    <circle cx="125" cy="62" r="48" fill="none" stroke="currentColor" stroke-opacity=".4" stroke-dasharray="2 3"/><circle cx="195" cy="62" r="48" fill="none" stroke="currentColor" stroke-opacity=".4" stroke-dasharray="2 3"/>
+    <circle cx="125" cy="62" r="12" fill="#79D6A6" stroke="${INK}" stroke-width="1.5"/><circle cx="195" cy="62" r="12" fill="#79D6A6" stroke="${INK}" stroke-width="1.5"/>
+    ${[100,132,164,196,228,260].map(d=>{const a=d*Math.PI/180;return `<circle cx="${(125+48*Math.cos(a)).toFixed(1)}" cy="${(62+48*Math.sin(a)).toFixed(1)}" r="3.6" fill="#FFC21A" stroke="${INK}"/>`;}).join('')}
+    ${[-80,-48,-16,16,48,80].map(d=>{const a=d*Math.PI/180;return `<circle cx="${(195+48*Math.cos(a)).toFixed(1)}" cy="${(62+48*Math.sin(a)).toFixed(1)}" r="3.6" fill="#FFC21A" stroke="${INK}"/>`;}).join('')}
+    <circle cx="160" cy="55" r="4.2" fill="#FFC21A" stroke="#A56BFF" stroke-width="2"/><circle cx="160" cy="69" r="4.2" fill="#FFC21A" stroke="#A56BFF" stroke-width="2"/>
+    <text x="160" y="124" text-anchor="middle" font-size="11" fill="currentColor">Cl₂：まん中の2個は両方のもの → どちらも6＋2＝8個</text></svg>
+   <p>水素どうし（H₂）も同じ。1個ずつ出し合えば、どちらも2個でヘリウムと同じ満杯になる。水（H₂O）やメタン（CH₄）も共有結合。共有結合は特別な方法ではなく、非金属どうしのふつうのつながり方。</p>`},
+ {t:'水素は相手しだい（H⁺ にも H⁻ にもなる）',
+  b:()=>{const X=en=>(20+(en-0.9)/(3.44-0.9)*280).toFixed(0);
+   const pts=[['Na',0.93,'#F5B400'],['Mg',1.31,'#B8C4D0'],['H',2.20,'#79D6A6'],['C',2.55,'#79D6A6'],['Cl',3.16,'#79D6A6'],['O',3.44,'#79D6A6']];
+   return `<p>原子には「電子を引っぱる力」がある。左の金属ほど弱く、右の非金属ほど強い。水素はそのまん中あたり。</p>
+   <svg viewBox="0 0 330 92">
+    <defs><linearGradient id="enbar" x1="0" x2="1"><stop offset="0" stop-color="#FF6B4A"/><stop offset=".5" stop-color="#A56BFF"/><stop offset="1" stop-color="#3D8BFF"/></linearGradient></defs>
+    <text x="12" y="14" font-size="11" fill="currentColor" opacity=".75">電子を引っぱる力　弱い ← → 強い</text>
+    <rect x="16" y="40" width="292" height="8" rx="4" fill="url(#enbar)"/>
+    ${pts.map((p,i)=>`<circle cx="${X(p[1])}" cy="44" r="${p[0]==='H'?9:7}" fill="${p[2]}" stroke="${INK}" stroke-width="${p[0]==='H'?2.4:1.5}"/><text x="${X(p[1])}" y="${i%2?78:30}" text-anchor="middle" font-size="12" font-weight="800" fill="currentColor">${p[0]}</text>`).join('')}
+   </svg>
+   <p><b>電子は、引っぱる力が強い方へ寄っていく。</b>だから水素は、相手によって向きが逆になる。</p>
+   <table><tr><th>相手</th><th>どうなる</th><th>例</th></tr>
+    <tr><td>塩素（水素より強い）</td><td>共有している電子が塩素側へ寄る。水にとけると電子ごと持っていかれて <b>H⁺</b></td><td>HCl → 塩酸</td></tr>
+    <tr><td>ナトリウム（水素より弱い）</td><td>ナトリウムが電子をわたし、水素が受け取って <b>H⁻</b>（ヘリウムと同じ満杯）</td><td>NaH、LiH、CaH₂</td></tr></table>
+   <p>H⁺ は、水素が手放したかったのではなく、相手に電子を持っていかれた結果。引っぱる力の差がとても大きいと電子がわたされ（イオン結合）、差が小さいと出し合う（共有結合）。合成モードで HCl と NaH を作りくらべてみよう。</p>`;}},
+ {t:'まとめ',
+  b:()=>`<p><b>① その原子がなりたい向き（外側の電子の数で決まる）</b></p>
+   <table><tr><th>外側の電子</th><th>なりたい向き</th><th>手</th><th>例</th></tr>
+   <tr><td>1〜3個</td><td>手放したい（＋）</td><td>赤・1〜3本</td><td>Na、Mg、Al</td></tr>
+   <tr><td>4個</td><td>同じ数でどちらとも言えない</td><td>紫・4本</td><td>C、Si</td></tr>
+   <tr><td>5〜7個</td><td>受け取りたい（−）</td><td>青・3〜1本</td><td>N、O、Cl</td></tr>
+   <tr><td>満杯</td><td>何もしない</td><td>0本</td><td>He、Ne、Ar</td></tr>
+   <tr><td>水素（1個、定員2個）</td><td>1個手放すのも受け取るのも同じでどちらとも言えない</td><td>紫・1本</td><td>H</td></tr></table>
+   <p><b>② つながり方（相手との組み合わせで決まる）</b></p>
+   <table><tr><th>組み合わせ</th><th>つながり方</th><th>例</th></tr>
+   <tr><td>赤 × 青</td><td>イオン結合（電子をわたす）</td><td>NaCl、MgO</td></tr>
+   <tr><td>青 × 青、紫 × 青、紫 × 紫</td><td>共有結合（電子を出し合う）</td><td>Cl₂、H₂、H₂O、CH₄</td></tr></table>
+   <p>手の数＝動かす電子の数。周期表の左ほど手放したい側（金属）、右ほど受け取りたい側（非金属）。金属どうしは「金属結合」という別のつながり方をするので、このゲームでは扱わない。</p>
+   <p>水素は相手しだいで H⁺ にも H⁻ にもなる（前のページ）。ホウ素は手放したい側の数だけど、実際は共有でつながることが多い。</p>`},
+];
+let lessonI=0;
+function rulerShow(n){
+  const out=document.getElementById('rulerOut');
+  if(n===8){out.innerHTML='<p><b>もう満杯。</b>何もしなくていい（希ガス）。手は0本。</p>';return;}
+  const give=n, get=8-n, max=8;
+  const ex=PUZ.filter(e=>e.z>1&&e.group!==18&&valence(e)===n).map(e=>e.sym).join('、');
+  const res=give<get?{t:'手放す方が近道',c:'#FF6B4A',k:'＋（赤）'}:give>get?{t:'受け取る方が近道',c:'#3D8BFF',k:'−（青）'}:{t:'同じ4個でどちらとも言えない',c:'#A56BFF',k:'±（紫）'};
+  out.innerHTML=`<div class="bars">
+    <div class="bar${give<get?' win':''}"><span style="width:6.5em">手放す ${give}個</span><i style="width:${give/max*60}%;background:#FF6B4A"></i></div>
+    <div class="bar${get<give?' win':''}"><span style="width:6.5em">受け取る ${get}個</span><i style="width:${get/max*60}%;background:#3D8BFF"></i></div></div>
+    <p><b style="color:${res.c}">${res.t}</b>。手は${Math.min(give,get)}本、色は${res.k}。${ex?`この数の元素：${ex}`:''}</p>`;
+}
+function renderIntro(open){
+  const box=document.getElementById('hintro');
+  if(!open){box.innerHTML='';return;}
+  const L=LESSONS[lessonI], last=lessonI===LESSONS.length-1;
+  box.innerHTML=`<div class="lesson"><div class="step">ルール編 ${lessonI+1}/${LESSONS.length}</div><h2>${L.t}</h2>${L.b()}
+    <div class="lnav"><button class="btn" id="lprev" ${lessonI===0?'disabled':''}>前へ</button>
+    ${last?'<button class="btn" id="lstart">パズルをはじめる</button>':'<button class="btn" id="lnext">次へ</button>'}</div></div>`;
+  if(L.init) L.init();
+  document.getElementById('lprev').addEventListener('click',()=>{lessonI--;renderIntro(true);});
+  if(last) document.getElementById('lstart').addEventListener('click',()=>{try{localStorage.setItem('haichi-intro','1');}catch(_){} renderIntro(false); hatom.scrollIntoView({block:'center',behavior:'smooth'});});
+  else document.getElementById('lnext').addEventListener('click',()=>{lessonI++;renderIntro(true);});
+}
+let introDone=false; try{introDone=localStorage.getItem('haichi-intro')==='1';}catch(_){}
+renderIntro(!introDone);
+document.getElementById('hrules').addEventListener('click',()=>{lessonI=0;renderIntro(true);document.getElementById('hintro').scrollIntoView({block:'start',behavior:'smooth'});});
+
+hatom.addEventListener('click',ev=>{const g=ev.target.closest('[data-shell]'); if(g) placeIn(+g.dataset.shell);});
+document.getElementById('hundo').addEventListener('click',undoH);
+document.getElementById('hreset').addEventListener('click',()=>startH(H.el));
+document.getElementById('hnext').addEventListener('click',()=>{
+  const i=PUZ.indexOf(H.el);
+  const nx=PUZ.slice(i+1).find(x=>!cleared.has(x.sym))||PUZ.find(x=>!cleared.has(x.sym))||PUZ[(i+1)%PUZ.length];
+  startH(nx);
+});
+startH(PUZ.find(x=>!cleared.has(x.sym))||PUZ[0]);
+
+// ================= 花火師モード =================
+const SR={z:38,sym:'Sr',name:'ストロンチウム',mass:88,shells:[2,8,18,8,2],group:2,period:5,kind:'metal',flame:'#E0245E',flameName:'紅'};
+const FL={
+ Li:{c:'#E5484D',nm:'赤',key:'red',pos:.07},
+ Sr:{c:'#E0245E',nm:'紅（こい赤）',key:'red',pos:.04},
+ Ca:{c:'#F2743B',nm:'橙赤',key:'orange',pos:.18},
+ Na:{c:'#FFC21A',nm:'黄',key:'yellow',pos:.34},
+ Ba:{c:'#9BD13B',nm:'黄緑',key:'yellowgreen',pos:.48},
+ Cu:{c:'#22B8A6',nm:'青緑',key:'bluegreen',pos:.60},
+ K:{c:'#B38BEA',nm:'淡い紫',key:'lilac',pos:.90},
+ Mg:{c:'#FFFFFF',nm:'白いかがやき',key:'white',noFlame:true,note:'これは炎色反応ではなく、マグネシウムが燃えるときの強い光。花火の白いかがやきに使われる。'},
+ Fe:{c:'#FFB84D',nm:'金色の火花',key:'sparks',noFlame:true,note:'これも炎色反応ではなく、鉄の細かい粉が燃えて飛び散る火花。線香花火やスパークラーの光。'},
+};
+const FSYMS=['Li','Sr','Ca','Na','Ba','Cu','K','Mg','Fe'];
+const FEL=s=>s==='Sr'?SR:EL[s];
+const STAGES=[
+ {key:'yellow',name:'黄色の花火',c:'#FFC21A'},
+ {key:'red',name:'赤い花火',c:'#E5484D'},
+ {key:'yellowgreen',name:'黄緑の花火',c:'#9BD13B'},
+ {key:'bluegreen',name:'青緑の花火',c:'#22B8A6'},
+ {key:'orange',name:'オレンジの花火',c:'#F2743B'},
+ {key:'lilac',name:'淡い紫の花火',c:'#B38BEA'},
+ {key:'white',name:'白くかがやく花火',c:'#FFFFFF'},
+ {key:'purple',name:'こい紫の花火（2つ混ぜる）',c:'#8E44E0'},
+];
+let fCleared=new Set(); try{fCleared=new Set(JSON.parse(localStorage.getItem('hanabi-cleared')||'[]'));}catch(_){}
+const F={sel:[],stage:STAGES.findIndex(st=>!fCleared.has(st.key))};
+if(F.stage<0) F.stage=0;
+const fsay=(t,w=false)=>{const x=document.getElementById('fstatus');x.textContent=t;x.classList.toggle('warn',w);};
+function renderMission(){
+  const st=STAGES[F.stage];
+  document.getElementById('fmission').innerHTML=`<div class="sw" style="background:${st.c}"></div><div><b>お題 ${F.stage+1}：${st.name}</b><span>${fCleared.has(st.key)?'クリア済み。ほかのお題にも挑戦しよう':'この色になる元素を選ぼう'}</span></div>`;
+  const n=STAGES.filter(x=>fCleared.has(x.key)).length;
+  document.getElementById('fcount').textContent=`${STAGES.length}題のうち ${n}題クリア`;
+  const box=document.getElementById('fstages');
+  box.innerHTML=STAGES.map((x,i)=>`<button class="slot${fCleared.has(x.key)?' made':''}" data-i="${i}" style="font:inherit;text-align:left;cursor:pointer"><b><span class="dot" style="background:${x.c}"></span>${i+1}</b>${x.name}</button>`).join('');
+  box.querySelectorAll('.slot').forEach(b=>b.addEventListener('click',()=>{F.stage=+b.dataset.i;renderMission();}));
+}
+function renderChips(){
+  const box=document.getElementById('fchips');
+  box.innerHTML=FSYMS.map(s=>{const e=FEL(s);return `<button class="fchip" data-s="${s}" aria-pressed="${F.sel.includes(s)}">${charSVG(e)}<span>${s}</span><small>${e.name}</small></button>`;}).join('');
+  box.querySelectorAll('.fchip').forEach(b=>b.addEventListener('click',()=>{
+    const s=b.dataset.s;
+    if(F.sel.includes(s)) F.sel=F.sel.filter(x=>x!==s);
+    else if(F.sel.length<2) F.sel.push(s);
+    else {fsay('混ぜられるのは2つまで。えらび直してね。',true);return;}
+    fsay(F.sel.length?`えらんだ元素：${F.sel.map(x=>FEL(x).name).join(' と ')}`:'元素をタップして選ぼう。');
+    renderChips();
+  }));
+}
+function mixResult(sel){
+  if(sel.length===1){const f=FL[sel[0]];return {key:f.key,colors:[[f.c,1]],style:f.key==='white'?'white':f.key==='sparks'?'sparks':'flame'};}
+  const [a,b]=sel;
+  if(sel.includes('Sr')&&sel.includes('Cu')) return {key:'purple',colors:[['#8E44E0',.6],['#E0245E',.2],['#3D6BFF',.2]],style:'flame',mix:'purple'};
+  if(sel.includes('Na')){const o=sel.find(x=>x!=='Na');return {key:'yellow',colors:[[FL.Na.c,.88],[FL[o].c,.12]],style:'flame',mix:'na'};}
+  return {key:'mix',colors:[[FL[a].c,.5],[FL[b].c,.5]],style:(FL[a].key==='sparks'||FL[b].key==='sparks')?'sparks':'flame',mix:'two'};
+}
+// ---- 夜空 ----
+const sky=document.getElementById('sky'), sctx=sky.getContext('2d');
+let SW=0,SH=260,parts=[],rockets=[],anim=null;
+function sizeSky(){const d=window.devicePixelRatio||1;SW=sky.clientWidth||340;sky.width=SW*d;sky.height=SH*d;sctx.setTransform(d,0,0,d,0,0);sctx.fillStyle='#0A1030';sctx.fillRect(0,0,SW,SH);}
+function pick(colors){let r=Math.random(),t=0;for(const [c,w] of colors){t+=w;if(r<=t)return c;}return colors[0][0];}
+function burst(x,y,res){
+  const n=res.style==='white'?170:res.style==='sparks'?110:150;
+  for(let i=0;i<n;i++){
+    const a=Math.random()*Math.PI*2, sp=res.style==='sparks'?0.8+Math.random()*2.8:0.9+Math.random()*2.5;
+    const life=res.style==='sparks'?35+Math.random()*25:60+Math.random()*40;
+    parts.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,life,max:life,c:pick(res.colors),st:res.style});
+  }
+}
+function drawStatic(res){
+  sctx.fillStyle='#0A1030';sctx.fillRect(0,0,SW,SH);
+  const cx=SW/2,cy=SH*0.42;
+  for(let i=0;i<150;i++){const a=Math.random()*Math.PI*2,r=20+Math.random()*80;sctx.fillStyle=pick(res.colors);sctx.beginPath();sctx.arc(cx+Math.cos(a)*r,cy+Math.sin(a)*r,2,0,7);sctx.fill();}
+}
+function step(){
+  sctx.globalCompositeOperation='source-over';
+  sctx.fillStyle='rgba(10,16,48,0.22)';sctx.fillRect(0,0,SW,SH);
+  sctx.globalCompositeOperation='lighter';
+  rockets=rockets.filter(r=>{
+    r.y+=r.vy; r.vy+=0.11;
+    sctx.fillStyle='#FFE7B0'; sctx.beginPath(); sctx.arc(r.x,r.y,2.2,0,7); sctx.fill();
+    if(r.vy>-0.6){burst(r.x,r.y,r.res);return false;} return true;
+  });
+  parts=parts.filter(p=>{
+    p.x+=p.vx;p.y+=p.vy;p.vy+=p.st==='sparks'?0.06:0.035;p.vx*=0.985;p.vy*=0.985;p.life--;
+    const al=Math.max(0,p.life/p.max);
+    sctx.globalAlpha=p.st==='white'?(Math.random()<0.3?al:al*0.35):al;
+    sctx.fillStyle=p.c;
+    if(p.st==='sparks'){sctx.strokeStyle=p.c;sctx.lineWidth=1.2;sctx.beginPath();sctx.moveTo(p.x,p.y);sctx.lineTo(p.x-p.vx*3,p.y-p.vy*3);sctx.stroke();}
+    else{sctx.beginPath();sctx.arc(p.x,p.y,1.9,0,7);sctx.fill();}
+    sctx.globalAlpha=1;
+    return p.life>0;
+  });
+  if(rockets.length||parts.length) anim=requestAnimationFrame(step); else anim=null;
+}
+function launch(){
+  if(!F.sel.length){fsay('まず元素を選ぼう。',true);return;}
+  if(!SW) sizeSky();
+  const res=mixResult(F.sel);
+  if(reduce){drawStatic(res);}
+  else{rockets.push({x:SW*(0.3+Math.random()*0.4),y:SH,vy:-(5.5+Math.random()*0.4),res}); if(!anim) anim=requestAnimationFrame(step);}
+  const st=STAGES[F.stage];
+  if(res.key===st.key){ if(!fCleared.has(st.key)){fCleared.add(st.key);try{localStorage.setItem('hanabi-cleared',JSON.stringify([...fCleared]));}catch(_){} }
+    fsay(`お題クリア！ ${st.name}が上がった。`); }
+  else fsay(res.key==='lilac'&&st.key==='purple'?'カリウムは淡い紫。もっとこい紫は、赤と青の光を混ぜると作れる。':`お題の色とはちがったみたい。いろいろ試してみよう。`, res.key!==st.key);
+  explain(res);
+  renderMission();
+}
+const SHL=['K','L','M','N','O','P'];
+function jumpSVG(c,e){
+  const lc=c==='#FFFFFF'?'#C9D2DC':c, X=SHL[e.shells.length-1];
+  return `<svg viewBox="0 0 200 124" aria-hidden="true">
+    <circle cx="52" cy="62" r="48" fill="none" stroke="currentColor" stroke-opacity=".45" stroke-dasharray="3 3"/>
+    <circle cx="52" cy="62" r="26" fill="none" stroke="currentColor" stroke-width="1.6" stroke-opacity=".7"/>
+    <circle cx="52" cy="62" r="9" fill="${lc}" stroke="${INK}" stroke-width="1.5"/><text x="52" y="66" text-anchor="middle" font-size="10" font-weight="800" fill="${INK}">＋</text>
+    <text x="52" y="31" text-anchor="middle" font-size="9" font-weight="800" fill="currentColor">${X}殻</text>
+    <text x="52" y="10" text-anchor="middle" font-size="9" fill="currentColor" opacity=".8">外側の空いている殻</text>
+    <g class="heat"><path d="M74 96 q4 -6 0 -11 q-4 -5 0 -10" fill="none" stroke="#FF6B4A" stroke-width="2.2" stroke-linecap="round"/><text x="80" y="100" font-size="9" fill="#FF6B4A" font-weight="800">熱</text></g>
+    <g class="el-out" style="transform-box:fill-box"><circle cx="78" cy="62" r="5.5" fill="#FFC21A" stroke="${INK}" stroke-width="1.3"/></g>
+    <path class="ph" d="M108 62 q6 -7 12 0 t12 0 t12 0 t12 0 t12 0 t12 0" fill="none" stroke="${lc}" stroke-width="3" stroke-linecap="round"/>
+    <text x="150" y="84" text-anchor="middle" font-size="9.5" font-weight="800" fill="currentColor">光</text>
+  </svg>`;
+}
+function spectrumSVG(pos,label){
+  const x=(12+pos*296).toFixed(0);
+  return `<svg viewBox="0 0 320 62" aria-hidden="true">
+   <defs><linearGradient id="spec" x1="0" x2="1"><stop offset="0" stop-color="#E5484D"/><stop offset=".2" stop-color="#F2743B"/><stop offset=".36" stop-color="#FFC21A"/><stop offset=".5" stop-color="#9BD13B"/><stop offset=".64" stop-color="#22B8A6"/><stop offset=".8" stop-color="#3D6BFF"/><stop offset="1" stop-color="#8E44E0"/></linearGradient></defs>
+   <text x="12" y="12" font-size="10" fill="currentColor" opacity=".75">もどるときに出るエネルギー　小さい ← → 大きい</text>
+   <rect x="12" y="22" width="296" height="12" rx="6" fill="url(#spec)"/>
+   <path d="M${x} 38 l-6 10 h12 z" fill="currentColor"/>
+   <text x="${x}" y="60" font-size="10.5" font-weight="800" text-anchor="middle" fill="currentColor">${label}</text></svg>`;
+}
+function explain(res){
+  const box=document.getElementById('fexplain');
+  const names=F.sel.map(x=>FEL(x).name).join(' と ');
+  let h='';
+  if(res.mix==='purple'){
+    h=`<h3>${names} → こい紫</h3><p>銅は塩素といっしょにすると青い光を出す（花火の青）。その青と、ストロンチウムの赤い光が目の中でまざって紫に見える。1つの元素では出しにくい色を、花火職人はこうして作る。</p>`;
+  }else if(res.mix==='na'){
+    h=`<h3>${names} → ほとんど黄色</h3><p>ナトリウムの黄色はとても強く、ほかの色をかくしてしまう。本物の実験では、青いコバルトガラスを通して見て黄色をさえぎり、もう一方の色を確かめる。</p>`;
+  }else if(res.mix==='two'){
+    h=`<h3>${names} → 2色の花火</h3><p>それぞれの元素が自分の色の光を出すので、2色がまざった花火になる。</p>`;
+  }else{
+    const s=F.sel[0], f=FL[s], e=FEL(s);
+    if(f.noFlame){ h=`<h3>${e.name}（${s}）→ ${f.nm}</h3><p>${f.note}</p>`; }
+    else h=`<h3>${e.name}（${s}）→ ${f.nm}</h3>
+      <div class="jump">${jumpSVG(f.c,e)}<div><p>電子（−）は原子核（＋）に引っぱられている。磁石にくっついたクリップと同じで、遠くへ引きはなすにはエネルギーがいる。</p>
+      <p>① 炎の熱のエネルギーで、${e.name}の${SHL[e.shells.length-1]}殻の電子が、その外側の空いている殻まで引きはなされる。<br>② 引きはなされた電子は、原子核に引っぱられて元の${SHL[e.shells.length-1]}殻へもどる。<br>③ もどるとき、引きはなすのに使ったエネルギーが光になって出てくる。</p></div></div>
+      ${spectrumSVG(f.pos,f.nm)}
+      <p>光のエネルギーは、赤が小さく、青や紫が大きい。どれだけのエネルギーで引きはなされるかは元素ごとに決まっているので、炎の色も元素ごとに決まる。</p>
+      <p style="color:var(--muted);font-size:.8rem">くわしく言うと、殻の中にもさらに小さな部屋があり、その間を移動するエネルギーで色が決まる（高校で習う）。</p>`;
+  }
+  h+=`<p style="color:var(--muted);font-size:.82rem">電子がもどるときにエネルギーが光になる仕組みは、LEDでも同じ。</p>`;
+  box.innerHTML=`<div class="fx">${h}</div>`;
+}
+document.getElementById('flaunch').addEventListener('click',launch);
+document.getElementById('fclearsel').addEventListener('click',()=>{F.sel=[];renderChips();fsay('元素をタップして選ぼう。');});
+document.getElementById('tab-hanabi').addEventListener('click',()=>{requestAnimationFrame(()=>{if(!SW)sizeSky();});});
+window.addEventListener('resize',()=>{if(SW){sizeSky();}});
+renderMission(); renderChips();
+
+// ================= 半導体・LED =================
+const SC=6, SRW=3, SX=i=>55+i*50, SY=j=>72+j*44, JX=180;
+const MATS={
+ Si:{name:'ケイ素（Si）',a:'Si',b:'Si',c:null,txt:'ほとんど光らない。落ちるエネルギーは、ほぼ熱になって逃げる。'},
+ GaAs:{name:'ヒ化ガリウム（GaAs）',a:'Ga',b:'As',c:'ir',txt:'目に見えない赤外線が出る。テレビのリモコンの光。'},
+ red:{name:'赤色LEDの材料（Ga・P など）',a:'Ga',b:'P',c:'#E5484D',txt:'出るエネルギーが小さめで、赤い光になる。'},
+ GaN:{name:'窒化ガリウム（GaN）',a:'Ga',b:'N',c:'#3D6BFF',txt:'出るエネルギーが大きく、青い光になる。青色LEDは実現がとてもむずかしく、日本の研究者（赤﨑勇・天野浩・中村修二）が成功させて、2014年にノーベル物理学賞を受けた。青に黄色の光を足すと白色LEDになる。'},
+};
+const SSTAGES=[
+ {t:'ケイ素だけ',goal:'スイッチを入れて、電球がつくか見てみよう',tools:[]},
+ {t:'n型',goal:'リン（P）を置いて、電球をつけよう',tools:['P']},
+ {t:'p型',goal:'ホウ素（B）を置いて、電球をつけよう',tools:['B']},
+ {t:'ダイオード',goal:'左半分にB、右半分にPを置き、電池の向きを両方ためそう',tools:['B','P']},
+ {t:'LED',goal:'材料を選んで、青く光らせよう',tools:[]},
+];
+let sCleared=new Set(); try{sCleared=new Set(JSON.parse(localStorage.getItem('semi-cleared')||'[]'));}catch(_){}
+const S={st:0,grid:[],carriers:[],on:false,plusLeft:false,tool:null,mat:'Si',saw:{f:false,r:false},flash:[],t:0,raf:null};
+const semi=document.getElementById('semi');
+const ssay=(t,w=false)=>{const x=document.getElementById('sstatus');x.textContent=t;x.classList.toggle('warn',w);};
+function sSave(){try{localStorage.setItem('semi-cleared',JSON.stringify([...sCleared]));}catch(_){}}
+function sStage(i){
+  S.st=i; S.on=false; S.plusLeft=false; S.tool=SSTAGES[i].tools[0]||null; S.saw={f:false,r:false}; S.flash=[];
+  S.grid=Array.from({length:SRW},()=>Array(SC).fill('Si'));
+  if(i===4){[[0,0],[1,2],[2,1],[0,2]].forEach(([c,r])=>S.grid[r][c]='B');[[3,1],[4,0],[5,2],[4,2]].forEach(([c,r])=>S.grid[r][c]='P');S.plusLeft=true;}
+  spawn(); renderStageUI(); ssay(SSTAGES[i].goal); explainSemi(); drawSemi();
+}
+function spawn(){
+  S.carriers=[];
+  for(let r=0;r<SRW;r++)for(let c=0;c<SC;c++){
+    const g=S.grid[r][c];
+    if(g==='P') S.carriers.push({k:'e',x:SX(c)+14,y:SY(r)-12,hx:SX(c)+14,r});
+    if(g==='B') S.carriers.push({k:'h',x:SX(c)+25,y:SY(r),hx:SX(c)+25,r});
+  }
+}
+const count=k=>S.grid.flat().filter(g=>g===k).length;
+function pnOK(){
+  let ok=true,hb=false,hp=false;
+  for(let r=0;r<SRW;r++)for(let c=0;c<SC;c++){const g=S.grid[r][c];
+    if(g==='B'){if(c>2)ok=false;else hb=true;} if(g==='P'){if(c<3)ok=false;else hp=true;}}
+  return ok&&hb&&hp;
+}
+const forward=()=>S.plusLeft; // p側（左）が＋極
+function renderStageUI(){
+  document.getElementById('sstages').innerHTML=SSTAGES.map((x,i)=>`<button class="hp${sCleared.has(i)?' cleared':''}" data-i="${i}" aria-pressed="${i===S.st}">${i+1}<small>${x.t}</small></button>`).join('');
+  document.querySelectorAll('#sstages .hp').forEach(b=>b.addEventListener('click',()=>sStage(+b.dataset.i)));
+  const st=SSTAGES[S.st];
+  document.getElementById('smission').innerHTML=`<div><b>ステージ ${S.st+1}：${st.t}</b><span>${st.goal}</span></div>`;
+  const tools=document.getElementById('stools');
+  if(S.st===4){
+    tools.innerHTML=Object.entries(MATS).map(([k,m])=>`<button class="tool" data-m="${k}" aria-pressed="${S.mat===k}">${m.name}</button>`).join('');
+    tools.querySelectorAll('.tool').forEach(b=>b.addEventListener('click',()=>{S.mat=b.dataset.m;S.flash=[];renderStageUI();explainSemi();drawSemi();checkSemi();}));
+  }else{
+    tools.innerHTML=st.tools.length?st.tools.map(t=>`<button class="tool" data-t="${t}" aria-pressed="${S.tool===t}">${t==='P'?'リン P（外側5個）':'ホウ素 B（外側3個）'}を置く</button>`).join('')+'<span style="font-size:.8rem;color:var(--muted);align-self:center">原子をタップして入れかえ</span>':'';
+    tools.querySelectorAll('.tool').forEach(b=>b.addEventListener('click',()=>{S.tool=b.dataset.t;renderStageUI();}));
+  }
+  document.getElementById('sflip').hidden=S.st<3;
+  document.getElementById('sswitch').textContent=S.on?'スイッチを切る':'スイッチを入れる';
+}
+semi.addEventListener('click',ev=>{
+  const g=ev.target.closest('[data-cell]'); if(!g||!S.tool||S.st===4) return;
+  const [r,c]=g.dataset.cell.split(',').map(Number);
+  S.grid[r][c]=S.grid[r][c]===S.tool?'Si':S.tool;
+  S.on=false; S.flash=[]; spawn(); renderStageUI(); drawSemi();
+  ssay(`${S.grid[r][c]==='Si'?'ケイ素にもどした':S.tool==='P'?'リンを置いた。電子が1個あまる':'ホウ素を置いた。電子が1個足りない「あな」ができる'}。`);
+});
+function current(){
+  if(!S.on) return 0;
+  if(S.st===0) return 0;
+  if(S.st===1) return Math.min(1,count('P')/4);
+  if(S.st===2) return Math.min(1,count('B')/4);
+  if(S.st===3) return pnOK()&&forward()?Math.min(1,Math.min(count('B'),count('P'))/3):0;
+  return forward()?1:0;
+}
+function stepSemi(){
+  S.t++;
+  const sp=0.9;
+  const plusX=S.plusLeft?30:330, minusX=S.plusLeft?330:30;
+  const pn=S.st>=3;
+  for(const q of S.carriers){
+    if(!S.on){q.x=q.hx+Math.sin((S.t+q.hx)*0.08)*2.5;continue;}
+    const toward=q.k==='e'?plusX:minusX, dir=Math.sign(toward-q.x);
+    if(!pn){ q.x+=dir*sp; if(q.x>335)q.x=25; if(q.x<25)q.x=335; continue; }
+    // pn接合
+    const fw=forward()&&(S.st===4||pnOK());
+    if(fw){
+      if(q.k==='e'){ if(q.x>JX+4) q.x-=sp; }
+      else { if(q.x<JX-4) q.x+=sp; }
+    }else{
+      if(q.k==='e'){ if(q.x<320) q.x+=sp; }
+      else { if(q.x>40) q.x-=sp; }
+    }
+  }
+  // 再結合
+  if(S.on&&S.st>=3&&forward()&&(S.st===4||pnOK())){
+    const e=S.carriers.find(q=>q.k==='e'&&q.x<=JX+5), h=S.carriers.find(q=>q.k==='h'&&q.x>=JX-5);
+    if(e&&h){
+      S.flash.push({x:JX,y:(e.y+h.y)/2,t:0});
+      e.x=330-Math.random()*10; h.x=30+Math.random()*10;
+    }
+  }
+  S.flash=S.flash.filter(f=>++f.t<70);
+  drawSemi();
+  S.raf=(S.on||S.carriers.length)&&!document.getElementById('view-semi').hidden?requestAnimationFrame(stepSemi):null;
+}
+function drawSemi(){
+  const cur=current(), pn=S.st>=3;
+  let h='';
+  // 領域
+  if(pn){h+=`<rect x="28" y="46" width="152" height="140" rx="8" fill="#FF6B4A" opacity=".08"/><rect x="180" y="46" width="152" height="140" rx="8" fill="#3D8BFF" opacity=".08"/>
+    <text x="104" y="40" text-anchor="middle" font-size="11" font-weight="800" fill="currentColor">p型（あなが運ぶ）</text><text x="256" y="40" text-anchor="middle" font-size="11" font-weight="800" fill="currentColor">n型（電子が運ぶ）</text>`;}
+  if(S.st===3&&S.on&&!forward()&&pnOK()) h+=`<rect x="140" y="46" width="80" height="140" fill="currentColor" opacity=".07"/><text x="180" y="200" text-anchor="middle" font-size="10" fill="currentColor">空乏層（運び手がいない）</text>`;
+  if(S.st===4&&S.on&&!forward()) h+=`<rect x="140" y="46" width="80" height="140" fill="currentColor" opacity=".07"/><text x="180" y="200" text-anchor="middle" font-size="10" fill="currentColor">空乏層（運び手がいない）</text>`;
+  // 導線・電池・電球
+  const L=S.plusLeft?'＋':'−', R=S.plusLeft?'−':'＋';
+  const lx=S.plusLeft?[172,188]:[172,188];
+  h+=`<path d="M30 116 H12 V242 H172 M188 242 H348 V116 H330" fill="none" stroke="currentColor" stroke-width="2" opacity=".7"/>
+    <line x1="172" y1="${S.plusLeft?226:233}" x2="172" y2="${S.plusLeft?258:251}" stroke="currentColor" stroke-width="${S.plusLeft?2:4}"/>
+    <line x1="188" y1="${S.plusLeft?233:226}" x2="188" y2="${S.plusLeft?251:258}" stroke="currentColor" stroke-width="${S.plusLeft?4:2}"/>
+    <text x="158" y="232" font-size="13" font-weight="800" fill="currentColor" text-anchor="middle">${L}</text><text x="202" y="232" font-size="13" font-weight="800" fill="currentColor" text-anchor="middle">${R}</text>
+    <text x="232" y="256" font-size="9" fill="currentColor" opacity=".7">電池（長い線が＋極）</text>`;
+  if(S.st<4){
+    h+=`<circle cx="348" cy="180" r="${10+cur*8}" fill="#FFD84D" opacity="${cur*0.35}"/><circle cx="348" cy="180" r="10" fill="${cur>0?'#FFD84D':'var(--panel)'}" stroke="currentColor" stroke-width="2"/><path d="M343 180 l3 -4 l4 4 l3 -4" fill="none" stroke="currentColor" stroke-width="1.2"/>
+      <text x="336" y="204" font-size="9" fill="currentColor" text-anchor="middle">電球</text>`;
+  }
+  // 結合
+  for(let r=0;r<SRW;r++)for(let c=0;c<SC;c++){
+    if(c<SC-1){h+=`<line x1="${SX(c)}" y1="${SY(r)}" x2="${SX(c+1)}" y2="${SY(r)}" stroke="currentColor" stroke-width="1.6" opacity=".45"/>`;
+      const hasHole=S.grid[r][c]==='B';
+      h+=`<circle cx="${SX(c)+22}" cy="${SY(r)-4}" r="2.4" fill="#FFC21A" stroke="${INK}" stroke-width=".8"/>`+(hasHole&&S.st<4?'':`<circle cx="${SX(c)+22}" cy="${SY(r)+4}" r="2.4" fill="#FFC21A" stroke="${INK}" stroke-width=".8"/>`);}
+    if(r<SRW-1){h+=`<line x1="${SX(c)}" y1="${SY(r)}" x2="${SX(c)}" y2="${SY(r+1)}" stroke="currentColor" stroke-width="1.6" opacity=".45"/><circle cx="${SX(c)-4}" cy="${SY(r)+22}" r="2.4" fill="#FFC21A" stroke="${INK}" stroke-width=".8"/><circle cx="${SX(c)+4}" cy="${SY(r)+22}" r="2.4" fill="#FFC21A" stroke="${INK}" stroke-width=".8"/>`;}
+  }
+  // 原子
+  const M=MATS[S.mat];
+  for(let r=0;r<SRW;r++)for(let c=0;c<SC;c++){
+    const g=S.grid[r][c];
+    let lab=g, fill=g==='P'?'#79D6A6':g==='B'?'#F2B8A0':'#7FA7B8';
+    if(S.st===4){lab=(r+c)%2?M.b:M.a; fill='#9DB4C4';}
+    h+=`<g data-cell="${r},${c}" style="cursor:${S.tool&&S.st<4?'pointer':'default'}"><circle cx="${SX(c)}" cy="${SY(r)}" r="14" fill="${fill}" stroke="${INK}" stroke-width="1.8"/><text x="${SX(c)}" y="${SY(r)+4}" text-anchor="middle" font-size="11" font-weight="800" fill="${INK}">${lab}</text></g>`;
+  }
+  // 運び手
+  for(const q of S.carriers){
+    if(q.k==='e') h+=`<circle cx="${q.x.toFixed(1)}" cy="${q.y}" r="7" fill="#FFC21A" opacity=".3"/><circle cx="${q.x.toFixed(1)}" cy="${q.y}" r="4" fill="#FFC21A" stroke="${INK}" stroke-width="1.2"/>`;
+    else h+=`<circle cx="${q.x.toFixed(1)}" cy="${q.y+4}" r="4.2" fill="var(--panel)" stroke="#FF6B4A" stroke-width="1.8" stroke-dasharray="2 1.6"/>`;
+  }
+  // 光（LED）
+  for(const f of S.flash){
+    const a=1-f.t/70, y=f.y-f.t*1.3;
+    if(S.st<4) continue;
+    if(M.c===null) h+=`<text x="${f.x+6}" y="${y}" font-size="10" fill="#FF6B4A" opacity="${a}">熱</text>`;
+    else if(M.c==='ir') h+=`<path d="M${f.x} ${y} q4 -5 8 0 t8 0 t8 0" fill="none" stroke="currentColor" stroke-dasharray="2 2" stroke-width="1.5" opacity="${a*0.6}"/>`;
+    else h+=`<path d="M${f.x-12} ${y} q4 -5 8 0 t8 0 t8 0" fill="none" stroke="${M.c}" stroke-width="3" stroke-linecap="round" opacity="${a}"/>`;
+  }
+  if(S.st===4&&S.on&&forward()&&M.c&&M.c!=='ir'){const pulse=0.35+0.15*Math.sin(S.t*0.15);h+=`<rect x="160" y="46" width="40" height="140" rx="12" fill="${M.c}" opacity="${pulse}"/><rect x="150" y="46" width="60" height="140" rx="16" fill="${M.c}" opacity="${pulse*0.4}"/>`;}
+  if(S.st===4) h+=`<text x="180" y="20" text-anchor="middle" font-size="11" font-weight="800" fill="currentColor">材料：${M.name}</text>`;
+  semi.innerHTML=h;
+}
+function checkSemi(){
+  const st=S.st, cur=current(); let msg='';
+  if(!S.on) return;
+  if(st===0){msg='電球はつかない。ケイ素の電子は全部、となりとの共有に使われていて動けない。'; sCleared.add(0);}
+  else if(st===1){ if(count('P')){msg=`電球がついた！ あまった電子（黄色）が＋極のほうへ流れている。リンを増やすと明るくなる。`;sCleared.add(1);} else msg='リンがないと、動ける電子がいない。';}
+  else if(st===2){ if(count('B')){msg=`電球がついた！ あな（点線の丸）が−極のほうへ動いている。ホウ素を増やすと明るくなる。`;sCleared.add(2);} else msg='ホウ素がないと、あながない。';}
+  else if(st===3){
+    if(!pnOK()){msg='左半分（p型）にはBだけ、右半分（n型）にはPだけを置こう。';}
+    else if(forward()){S.saw.f=true;msg='流れた！ p側を＋極につなぐと、電子とあなが真ん中へ向かい、出会って消えながら次々に流れこむ。';}
+    else {S.saw.r=true;msg='流れない。逆につなぐと、電子とあなが両はしへ引っぱられ、真ん中に運び手がいない空乏層ができる。';}
+    if(S.saw.f&&S.saw.r){sCleared.add(3);msg+=' 一方向にしか流れない部品、これがダイオード。';}
+  }else{
+    const M=MATS[S.mat];
+    if(!forward()) msg='逆向きなので流れず、光らない。';
+    else {msg=`${M.name}：${M.txt}`; if(S.mat==='GaN') sCleared.add(4);}
+  }
+  sSave(); ssay(msg, cur===0&&st!==0&&!(st===3&&S.saw.r&&!forward())); renderStageUI();
+}
+function explainSemi(){
+  const E2=[
+   'ケイ素は外側の電子4個を、となりの4つと1個ずつ出し合って共有している（線の上の黄色い2つの点）。手が全部つながっているので、電子は動けず、電気をほとんど通さない。',
+   'リンは外側の電子が5個。4個をケイ素と共有すると、1個あまる。あまった電子は自由に動けるので、電池をつなぐと＋極のほうへ流れる。マイナスの電子が運ぶので n型（negative）。',
+   'ホウ素は外側の電子が3個。ケイ素と共有するのに1個足りず、「あな（ホール）」ができる。となりの電子があなに飛びこむと、あなは反対向きに動く。あなは＋のように働くので p型（positive）。',
+   'p型とn型をくっつけると、電流は一方向にしか流れない。p側を＋極につなぐと電子とあなが真ん中で出会って流れ、逆につなぐと両はしへ引っぱられて流れない。',
+   'n型のあまった電子は、結合の外にはみ出していて落ち着かない。p型のあな（電子の空席）に入ると、結合の中におさまって落ち着く。そのとき、あまっていたエネルギーが出てくる。ケイ素ではほぼ熱になるが、ガリウムなどの材料では光になる。出るエネルギーが大きいほど青い光になるのは、花火の炎色反応と同じ。',
+  ];
+  document.getElementById('sexplain').innerHTML=`<div class="fx"><p>${E2[S.st]}</p></div>`;
+}
+document.getElementById('sswitch').addEventListener('click',()=>{
+  S.on=!S.on; if(!S.on){S.flash=[];spawn();}
+  renderStageUI(); if(S.on){checkSemi(); if(!S.raf&&!reduce) S.raf=requestAnimationFrame(stepSemi);} else ssay('スイッチを切った。');
+  if(reduce) drawSemi();
+});
+document.getElementById('sflip').addEventListener('click',()=>{
+  S.plusLeft=!S.plusLeft; S.flash=[]; spawn(); renderStageUI(); drawSemi();
+  if(S.on) checkSemi(); else ssay(`電池の向きを変えた（左が${S.plusLeft?'＋':'−'}極）。`);
+});
+document.getElementById('sreset').addEventListener('click',()=>sStage(S.st));
+document.getElementById('tab-semi').addEventListener('click',()=>{if(!S.raf&&!reduce) S.raf=requestAnimationFrame(stepSemi);});
+sStage([0,1,2,3,4].find(i=>!sCleared.has(i))??0);
+
+// ================= 共通：保護者設定 =================
+const DAY=86400000;
+const PARENT=(()=>{const d={pw:'',limit:60,review:3};try{return Object.assign(d,JSON.parse(localStorage.getItem('parent')||'{}'));}catch(_){return d;}})();
+const saveParent=()=>{try{localStorage.setItem('parent',JSON.stringify(PARENT));}catch(_){}};
+
+// ================= 記号トレーニング =================
+let KS={}; try{KS=JSON.parse(localStorage.getItem('kigo-state')||'{}');}catch(_){}
+const saveKS=()=>{try{localStorage.setItem('kigo-state',JSON.stringify(KS));}catch(_){}};
+const KE=E.slice();
+const ks=sym=>KS[sym]||(KS[sym]={lv:0,due:0,wrong:0});
+const dueList=()=>{const now=Date.now();return KE.filter(e=>{const k=KS[e.sym];return k&&k.due&&k.due<=now;});};
+const waitList=()=>{const now=Date.now();return KE.filter(e=>{const k=KS[e.sym];return k&&k.due&&k.due>now;});};
+const masteredN=()=>KE.filter(e=>(KS[e.sym]||{}).lv>=3).length;
+const ALLSYMS=[...new Set(ALL.map(x=>x.sym).filter(x=>!/-/.test(x)))];
+let KQ=null;
+function choiceSyms(e){
+  const same=shuffle(ALLSYMS.filter(x=>x!==e.sym&&x[0]===e.sym[0]));
+  const other=shuffle(ALLSYMS.filter(x=>x!==e.sym&&x[0]!==e.sym[0]));
+  return shuffle([e.sym,...same.slice(0,2),...other].slice(0,4));
+}
+function makeTiles(sym){
+  const L='ABCDEFGHIKLMNOPRSTUZ', l='abcdeghilmnorstu';
+  const t=sym.split('');
+  t.push(sym[0].toLowerCase());
+  if(sym.length>1) t.push(sym[1].toUpperCase());
+  while(t.length<6){const c=Math.random()<0.5?L[Math.floor(Math.random()*L.length)]:l[Math.floor(Math.random()*l.length)]; if(!t.includes(c)) t.push(c);}
+  return shuffle(t).map((c,i)=>({c,i,used:false}));
+}
+function nextQ(){
+  const due=dueList();
+  let e,mode,review=false;
+  if(due.length){e=due[Math.floor(Math.random()*due.length)];mode='type';review=true;}
+  else{
+    const pool=KE.filter(x=>ks(x.sym).lv<3), src=pool.length?pool:KE;
+    const minLv=Math.min(...src.map(x=>ks(x.sym).lv)), cand=src.filter(x=>ks(x.sym).lv===minLv);
+    e=cand[Math.floor(Math.random()*cand.length)];
+    mode=['choice','tile','type','type'][ks(e.sym).lv];
+  }
+  const dir=mode==='choice'&&Math.random()<0.35?'sym2name':'name2sym';
+  KQ={e,mode,review,dir,picked:[],done:null};
+  if(mode==='tile') KQ.tiles=makeTiles(e.sym);
+  if(mode==='choice') KQ.opts=dir==='name2sym'?choiceSyms(e):pickOpts(e.name,KE.map(x=>x.name));
+  renderK();
+}
+function answerK(ans){
+  const e=KQ.e, k=ks(e.sym), ok=KQ.dir==='sym2name'?ans===e.name:ans===e.sym;
+  let msg;
+  if(ok){
+    if(KQ.review){k.due=0;msg='復習クリア！';}
+    else{k.lv=Math.min(3,k.lv+1);msg=k.lv>=3?`正解！ ${e.name}（${e.sym}）を覚えた！`:`正解！ つぎは${['','タイル','手入力'][k.lv]}で出るよ。`;}
+  }else{
+    const caseOnly=KQ.dir==='name2sym'&&ans.toLowerCase()===e.sym.toLowerCase();
+    k.lv=Math.max(0,k.lv-1); k.wrong=(k.wrong||0)+1; k.due=Date.now()+PARENT.review*DAY;
+    msg=(caseOnly?'おしい！ 1文字目は大文字、2文字目は小文字で書く。':'ざんねん。')+`正解は ${e.name}＝${e.sym}。${PARENT.review?PARENT.review+'日後':'あとで'}に復習で出るよ。`;
+  }
+  saveKS(); KQ.done={ok,msg}; renderK();
+}
+function renderK(){
+  const due=dueList().length, wait=waitList().length;
+  document.getElementById('kstats').innerHTML=`<span>覚えた ${masteredN()}/${KE.length}</span><span>今日の復習 ${due}問</span><span>復習待ち ${wait}問</span>`;
+  const q=KQ, e=q.e, lv=ks(e.sym).lv;
+  const badge=q.review?'<span class="kbadge rev">復習（手入力）</span>':`<span class="kbadge">${{choice:'4択',tile:'タイル',type:'手入力'}[q.mode]}</span>`;
+  const prompt=q.dir==='name2sym'?`<div class="kq">${charSVG(e)}<div><div class="big">${e.name}</div>の元素記号は？</div></div>`
+                                  :`<div class="kq">${charSVG(e)}<div><div class="big">${e.sym}</div>はなんという元素？</div></div>`;
+  let body='';
+  if(q.done){
+    body=`<div class="kres ${q.done.ok?'ok':'ng'}">${q.done.msg}</div><div class="row" style="margin-top:10px"><button class="btn launch" id="knext">つぎへ</button></div>`;
+  }else if(q.mode==='choice'){
+    body=`<div class="row">${q.opts.map(o=>`<button class="opt" data-a="${o}">${o}</button>`).join('')}</div>`;
+  }else if(q.mode==='tile'){
+    body=`<div class="kslots">${e.sym.split('').map((_,i)=>`<div class="kslot" data-si="${i}">${q.picked[i]!=null?q.tiles[q.picked[i]].c:''}</div>`).join('')}</div>
+      <div class="ktiles">${q.tiles.map(t=>`<button class="ktile" data-ti="${t.i}" ${q.picked.includes(t.i)?'disabled':''}>${t.c}</button>`).join('')}</div>
+      <p style="font-size:.8rem;color:var(--muted);margin:0">タイルを順にタップ。入れたマスをタップすると外せる。</p>`;
+  }else{
+    body=`<div class="row"><input class="kin" id="kinput" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="3" placeholder="記号を入力"><button class="btn launch" id="kgo">答える</button></div>`;
+  }
+  document.getElementById('kcard').innerHTML=`<div class="kcard">${badge}${prompt}${body}</div>`;
+  const c=document.getElementById('kcard');
+  c.querySelectorAll('.opt').forEach(b=>b.addEventListener('click',()=>answerK(b.dataset.a)));
+  c.querySelectorAll('.ktile').forEach(b=>b.addEventListener('click',()=>{
+    q.picked.push(+b.dataset.ti);
+    if(q.picked.length===e.sym.length) answerK(q.picked.map(i=>q.tiles[i].c).join('')); else renderK();
+  }));
+  c.querySelectorAll('.kslot').forEach(d=>d.addEventListener('click',()=>{const i=+d.dataset.si;if(q.picked[i]!=null){q.picked.splice(i,1);renderK();}}));
+  const inp=document.getElementById('kinput');
+  if(inp){const go=()=>{const v=inp.value.trim();if(v)answerK(v);};document.getElementById('kgo').addEventListener('click',go);inp.addEventListener('keydown',ev=>{if(ev.key==='Enter')go();});}
+  const nx=document.getElementById('knext'); if(nx) nx.addEventListener('click',nextQ);
+  const now=Date.now();
+  document.getElementById('kmap').innerHTML=KE.map(x=>{const k=KS[x.sym]||{lv:0};return `<div class="l${k.lv}${k.due?' rv':''}">${k.lv>=3?x.sym:'<span class="kz">'+x.z+'</span>'}</div>`;}).join('');
+}
+
+// ================= 記号の謎解き =================
+const NZ=[
+ {s:'Na',en:'sodium（ソディウム）',a:'natrium',
+  st:'ラテン語の natrium から。もとは古代エジプトの湖でとれた天然の塩「ナトロン」。英語の sodium は「ソーダ」から来ていて、ソーダ水の「ソーダ」も同じなかまのことば。日本語の「ナトリウム」は、明治時代に化学をドイツから学んだので、ドイツ語読みがそのまま残った。',
+  hq:'古代エジプトでは、ナトロンを何に使った？',ho:['ミイラ作り','ピラミッドの石を切る','パンをふくらませる'],ha:'ミイラ作り',
+  hx:'ナトロンで体をおおって水分をぬき、くさらないようにした。'},
+ {s:'K',en:'potassium（ポタシウム）',a:'kalium',
+  st:'ラテン語の kalium から。もとはアラビア語の al-qali（植物を燃やした灰）で、「アルカリ」ということばも同じところから来ている。英語の potassium は pot ash（つぼの灰）。昔は木の灰をつぼで煮て取り出していた。',
+  hq:'山菜の「あく抜き」に使う「灰汁（あく）」の正体は？',ho:['木の灰をとかした水','お酢','塩水'],ha:'木の灰をとかした水',
+  hx:'木の灰にはカリウムの化合物が多く、とかすとアルカリ性の水になる。カリウムの名前のもとと同じ「灰」。'},
+ {s:'Fe',en:'iron（アイアン）',a:'ferrum',
+  st:'ラテン語の ferrum から。人類が最初に使った鉄は、地面の中からではなく、空から落ちてきたものだった。',
+  hq:'エジプトの王ツタンカーメンの墓から出た短剣。その鉄はどこから来た？',ho:['隕石','海の底の砂','火山の溶岩'],ha:'隕石',
+  hx:'2016年の分析で、ニッケルを多くふくむ隕石の鉄だとわかった。鉄を作る技術が広まる前から、空の鉄は宝物だった。'},
+ {s:'Cu',en:'copper（コッパー）',a:'cuprum',
+  st:'ラテン語の cuprum から。古代、地中海のキプロス島で銅がたくさんとれたので「キプロスの金属」と呼ばれた。英語の copper も同じ語源。',
+  hq:'銅でできたアメリカの「自由の女神」。できたばかりのときは何色だった？',ho:['10円玉のような赤茶色','今と同じ緑色','まっ白'],ha:'10円玉のような赤茶色',
+  hx:'空気や雨にふれて表面にさび（緑青）ができ、30年ほどかけて今の緑色になった。'},
+ {s:'Ag',en:'silver（シルバー）',a:'argentum',
+  st:'ラテン語の argentum から。南米のアルゼンチンは「銀の国」という意味で、銀を求めてやってきた人たちが名づけた。銀は、すべての金属の中でいちばん電気と熱を通しやすい。',
+  hq:'銀のスプーンで、ゆで卵の黄身を食べると？',ho:['スプーンが黒くなる','スプーンが金色になる','何も変わらない'],ha:'スプーンが黒くなる',
+  hx:'卵にふくまれる硫黄と銀が結びついて、黒い硫化銀ができる。'},
+ {s:'Sn',en:'tin（ティン）',a:'stannum',
+  st:'ラテン語の stannum から。スズは寒さに弱く、とても寒い場所に長く置くと、ボロボロの灰色の粉になることがある。これを「スズペスト」と呼ぶ。',
+  hq:'ナポレオンの軍隊がロシアの冬に負けた理由の一つと言われる話は？',ho:['服のスズのボタンがボロボロになった','スズの鍋がとけた','スズの剣が金に変わった'],ha:'服のスズのボタンがボロボロになった',
+  hx:'ボタンがくずれて寒さをしのげなかった、という話が有名。ただし本当かどうかはわかっていない、言い伝えの一つ。'},
+ {s:'Au',en:'gold（ゴールド）',a:'aurum',
+  st:'ラテン語の aurum から。「かがやく」という意味のことばがもとだと言われている。金はとてものびやすく、うすくたたくと光が通るほどになる。',
+  hq:'和菓子やお酒にのせる金箔。その厚さはどれくらい？',ho:['1万分の1ミリほど','1ミリほど','1センチほど'],ha:'1万分の1ミリほど',
+  hx:'日本の金箔のほとんどは石川県金沢市で作られている。光にすかすと青緑色に見えるほどうすい。'},
+ {s:'Hg',en:'mercury（マーキュリー）',a:'hydrargyrum',
+  st:'ギリシャ語の「水」と「銀」を合わせた hydrargyrum から。日本でも昔から「みずがね」と呼ばれてきた。英語の mercury は、足の速い神様（水星）の名前。コロコロすばやく動くようすから。',
+  hq:'奈良の大仏を金色にぬったとき、水銀をどう使った？',ho:['金を水銀にとかしてぬり、熱で水銀を飛ばした','水銀で大仏をみがいた','水銀を金色の絵の具にまぜた'],ha:'金を水銀にとかしてぬり、熱で水銀を飛ばした',
+  hx:'金は水銀にとける。ぬったあと火であぶると水銀だけが蒸発して、金がうすく残る。'},
+ {s:'Pb',en:'lead（レッド）',a:'plumbum',
+  st:'ラテン語の plumbum から。古代ローマでは水道管を鉛で作っていたので、英語で配管工を plumber と呼ぶ。',
+  hq:'では「鉛筆」の芯には、鉛が入っている？',ho:['入っていない（炭素の黒鉛）','入っている','昔は入っていたが今はない'],ha:'入っていない（炭素の黒鉛）',
+  hx:'芯は黒鉛（炭素）とねんど。昔、黒鉛を鉛のなかまだと思っていたので「鉛筆」と名づけられた。英語でも芯を lead と呼ぶ。'},
+ {s:'W',en:'tungsten（タングステン）',a:'wolfram',bonus:true,
+  st:'ドイツ語の Wolfram（オオカミのよだれ）から。スズを取り出すとき、この鉱石がまざるとスズが減ってしまうので、「スズを食べるオオカミ」と呼ばれた。日本語名のタングステンは、スウェーデン語の「重い石」。',
+  hq:'タングステンの前に、エジソンが電球のフィラメントに使って成功した材料は？',ho:['日本の竹','金','鉛'],ha:'日本の竹',
+  hx:'京都の八幡の竹を炭にしたフィラメントが、長く光り続けた。今の電球のフィラメントはタングステン。'},
+ {s:'Sb',en:'antimony（アンチモニー）',a:'stibium',bonus:true,
+  st:'ラテン語の stibium から。アンチモンをふくむ黒い鉱物の粉は、古代から化粧品として使われていた。',
+  hq:'古代エジプトでは、その黒い粉を何に使った？',ho:['目のまわりを黒くぬる化粧','料理の味つけ','壁画の白い絵の具'],ha:'目のまわりを黒くぬる化粧',
+  hx:'アイラインのように目を大きく見せ、日差しや虫よけの意味もあったと言われる。'},
+];
+let nSolved=new Set(); try{nSolved=new Set(JSON.parse(localStorage.getItem('nazo-solved')||'[]'));}catch(_){}
+let nHee=new Set(); try{nHee=new Set(JSON.parse(localStorage.getItem('nazo-hee')||'[]'));}catch(_){}
+let NQ=null;
+function hl(word,sym){
+  const w=word.toLowerCase(), a=sym[0].toLowerCase(), b=sym[1]?sym[1].toLowerCase():null;
+  const i=w.indexOf(a); let j=b?w.indexOf(b,i+1):-1;
+  return word.split('').map((c,k)=>(k===i||k===j)?`<b style="color:var(--accent);font-size:1.15em">${k===i?c.toUpperCase():c}</b>`:c).join('');
+}
+function startNazo(i){
+  const z=NZ[i];
+  NQ={i,opts:pickOpts(z.a,NZ.map(x=>x.a)),hopts:shuffle(z.ho),msg:'',phase:nSolved.has(z.s)?(nHee.has(z.s)?'done':'hee'):'decode',hres:null};
+  renderNazo();
+}
+function renderNazo(){
+  const main=NZ.filter(z=>!z.bonus);
+  document.getElementById('ncount').textContent=`${main.length}問のうち ${main.filter(z=>nSolved.has(z.s)).length}問 解読・へぇクイズ ${nHee.size}/${NZ.length}`;
+  const z=NZ[NQ.i];
+  let body='';
+  if(NQ.phase==='decode'){
+    body=`<div class="kq"><div class="big" style="font-size:2.4rem;min-width:72px;text-align:center">${z.s}</div><div>英語では <b>${z.en}</b>。<br>でも記号は「${z.s}」。記号のもとになったことばは？</div></div>
+      <div class="row">${NQ.opts.map(o=>`<button class="opt" data-a="${o}">${o}</button>`).join('')}</div>${NQ.msg?`<div class="kres ng">${NQ.msg}</div>`:''}`;
+  }else{
+    body=`<div class="kq"><div class="big" style="font-size:2.4rem;min-width:72px;text-align:center">${z.s}</div><div style="font-size:1.2rem">${hl(z.a,z.s)}</div></div>
+      <p style="margin:6px 0 10px;font-size:.92rem">${z.st}</p>
+      <div class="qbox"><div class="q">へぇクイズ：${z.hq}</div>
+      ${NQ.phase==='hee'?`<div class="row">${NQ.hopts.map(o=>`<button class="opt" data-h="${o}">${o}</button>`).join('')}</div>`
+        :`<div class="kres ${NQ.hres===false?'ng':'ok'}">${NQ.hres===false?'ざんねん。':''}こたえ：<b>${z.ha}</b>。${z.hx}</div>`}</div>
+      ${NQ.phase==='done'?`<div class="row" style="margin-top:10px"><button class="btn launch" id="nnext">つぎの暗号</button></div>`:''}`;
+  }
+  document.getElementById('ncard').innerHTML=`<div class="kcard"><span class="kbadge">暗号 ${NQ.i+1}${z.bonus?'（ボーナス）':''}</span>${body}</div>`;
+  document.querySelectorAll('#ncard .opt[data-a]').forEach(b=>b.addEventListener('click',()=>{
+    if(b.dataset.a===z.a){NQ.phase='hee';nSolved.add(z.s);try{localStorage.setItem('nazo-solved',JSON.stringify([...nSolved]));}catch(_){}}
+    else NQ.msg=`ちがうみたい。記号「${z.s}」の文字が、順番に入っていることばを探そう。`;
+    renderNazo();
+  }));
+  document.querySelectorAll('#ncard .opt[data-h]').forEach(b=>b.addEventListener('click',()=>{
+    NQ.hres=b.dataset.h===z.ha; NQ.phase='done'; nHee.add(z.s);
+    try{localStorage.setItem('nazo-hee',JSON.stringify([...nHee]));}catch(_){}
+    renderNazo();
+  }));
+  const nn=document.getElementById('nnext'); if(nn) nn.addEventListener('click',()=>{const j=NZ.findIndex((x,k)=>k>NQ.i&&!nHee.has(x.s));startNazo(j>=0?j:(NQ.i+1)%NZ.length);});
+  document.getElementById('nlist').innerHTML=NZ.map((x,i)=>`<button class="slot${nSolved.has(x.s)?' made':''}" data-i="${i}" style="font:inherit;text-align:left;cursor:pointer;background:${nSolved.has(x.s)?'var(--panel)':'transparent'}"><b>${x.s}</b>${nSolved.has(x.s)?x.a:'？'}</button>`).join('');
+  document.querySelectorAll('#nlist .slot').forEach(b=>b.addEventListener('click',()=>startNazo(+b.dataset.i)));
+}
+function kseg(v){
+  document.getElementById('ktrain').hidden=v!=='train'; document.getElementById('knazo').hidden=v!=='nazo';
+  document.getElementById('kseg-train').setAttribute('aria-selected',v==='train'); document.getElementById('kseg-nazo').setAttribute('aria-selected',v==='nazo');
+}
+document.getElementById('kseg-train').addEventListener('click',()=>kseg('train'));
+document.getElementById('kseg-nazo').addEventListener('click',()=>kseg('nazo'));
+nextQ(); startNazo(Math.max(0,NZ.findIndex(z=>!nHee.has(z.s))));
+
+// ================= プレイ時間 =================
+const today=()=>new Date().toDateString();
+const PLAY=(()=>{try{const p=JSON.parse(localStorage.getItem('play')||'{}');return p.date===today()?p:{date:today(),sec:0,extra:0};}catch(_){return {date:today(),sec:0,extra:0};}})();
+const savePlay=()=>{try{localStorage.setItem('play',JSON.stringify(PLAY));}catch(_){}};
+let locked=false;
+function limitSec(){return (PARENT.limit+PLAY.extra)*60;}
+function checkLimit(){
+  if(!PARENT.pw||!PARENT.limit) return;
+  if(PLAY.sec>=limitSec()&&!locked){
+    locked=true; document.getElementById('lockMsg').textContent=`今日は${Math.floor(PLAY.sec/60)}分あそんだよ。`;
+    document.getElementById('lock').hidden=false; document.getElementById('lockErr').textContent=''; document.getElementById('lockPw').value='';
+  }
+}
+setInterval(()=>{
+  if(document.visibilityState!=='visible'||locked) return;
+  if(PLAY.date!==today()){PLAY.date=today();PLAY.sec=0;PLAY.extra=0;}
+  PLAY.sec+=5; savePlay(); checkLimit();
+},5000);
+document.getElementById('lockOk').addEventListener('click',()=>{
+  if(document.getElementById('lockPw').value===PARENT.pw){PLAY.extra+=30;savePlay();locked=false;document.getElementById('lock').hidden=true;}
+  else document.getElementById('lockErr').textContent='パスワードがちがいます。';
+});
+checkLimit();
+
+// ================= 保護者メニュー =================
+let parentAuthed=false, resetArmed=false, importData=null;
+const APP_ID='genso-lab', PROGRESS_KEYS=['kigo-state','nazo-solved','nazo-hee','zukan-unlocked','haichi-cleared','haichi-intro','gousei-made','hanabi-cleared','semi-cleared'];
+const BACKUP_KEYS=[...PROGRESS_KEYS,'parent'];
+function makeBackup(){
+  const data={}; BACKUP_KEYS.forEach(k=>{try{const v=localStorage.getItem(k); if(v!==null) data[k]=v;}catch(_){}}); 
+  return JSON.stringify({app:APP_ID,v:1,saved:new Date().toISOString(),data});
+}
+function parseBackup(txt){
+  let o; try{o=JSON.parse(txt.trim());}catch(_){return {err:'記録の形になっていません。書き出したときの文字を、最初から最後までそのまま貼りつけてください。'};}
+  if(!o||o.app!==APP_ID||typeof o.data!=='object') return {err:'このアプリの記録ではありません。'};
+  const data={}; for(const [k,v] of Object.entries(o.data)){ if(BACKUP_KEYS.includes(k)&&typeof v==='string') data[k]=v; }
+  const n=k=>{try{const x=JSON.parse(data[k]||'[]');return Array.isArray(x)?x.length:Object.keys(x).length;}catch(_){return 0;}};
+  return {saved:o.saved,data,summary:`図鑑 ${n('zukan-unlocked')}　電子配置 ${n('haichi-cleared')}　合成 ${n('gousei-made')}　花火 ${n('hanabi-cleared')}　半導体 ${n('semi-cleared')}`};
+}
+function backupName(){const d=new Date(),z=x=>String(x).padStart(2,'0');return `gensolab-${d.getFullYear()}${z(d.getMonth()+1)}${z(d.getDate())}.json`;}
+// claude.ai の公開ページでは、ページが直接ファイルを保存できない。正式な保存のしくみ（downloads）を使う
+const DL=(window.claude&&typeof window.claude.use==='function')?window.claude.use('downloads').catch(()=>null):Promise.resolve(null);
+async function saveBackupFile(msg){
+  const txt=makeBackup(), name=backupName();
+  if(window.claude&&typeof window.claude.use==='function'){
+    msg('保存の確認を待っています…');
+    const dl=await DL;
+    if(!dl){ msg('この画面ではファイルに保存できません。「文字でコピー」を使ってください。',true); return; }
+    try{ await dl.save({filename:name,data:txt}); msg(`${name} を保存しました。iPhoneでは「ファイル」アプリの保存した場所に入っています。`); }
+    catch(e){ const c=e&&e.code;
+      if(c==='declined') msg('保存をやめました。');
+      else if(c==='rate_limited') msg('確認の画面がもう開いています。そちらを先に閉じてください。',true);
+      else msg('ファイルに保存できませんでした。「文字でコピー」を使ってください。',true); }
+    return;
+  }
+  // 自分で公開したページ（PWA版）
+  try{
+    const f=new File([txt],name,{type:'application/json'});
+    if(navigator.canShare&&navigator.canShare({files:[f]})){ await navigator.share({files:[f],title:'げんそラボの記録'}); msg('送り先で保存できたか確かめてください（iPhoneは「"ファイル"に保存」）。'); return; }
+  }catch(e){ if(e&&e.name==='AbortError'){msg('保存をやめました。');return;} }
+  try{
+    const url=URL.createObjectURL(new Blob([txt],{type:'application/json'}));
+    const a=document.createElement('a'); a.href=url; a.download=name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),4000);
+    msg(`${name} のダウンロードを始めました。見つからないときは「文字でコピー」を使ってください。`);
+  }catch(_){ msg('ファイルに保存できませんでした。「文字でコピー」を使ってください。',true); }
+}
+
+function openParent(){document.getElementById('parent').hidden=false;renderParent();}
+function renderParent(){
+  const b=document.getElementById('parentBody');
+  if(PARENT.pw&&!parentAuthed){
+    b.innerHTML=`<p>パスワードを入れてください。</p><div class="row"><input class="kin" id="ppw" type="password" inputmode="numeric" autocomplete="off"><button class="btn launch" id="ppwOk">開く</button></div><p class="pmsg" id="ppwErr"></p>`;
+    document.getElementById('ppwOk').addEventListener('click',()=>{if(document.getElementById('ppw').value===PARENT.pw){parentAuthed=true;renderParent();}else document.getElementById('ppwErr').textContent='パスワードがちがいます。';});
+    return;
+  }
+  const lim=[0,30,60,90,120], rv=[0,1,3,7];
+  const nm=[...new Set(RECIPES.filter(r=>!r.bonus).map(r=>r.fm))].filter(f=>made.has(f)).length;
+  b.innerHTML=`
+   <h3>パスワード</h3>
+   <p style="font-size:.85rem;margin:0 0 6px">${PARENT.pw?'設定済み。変更するときは新しいパスワードを入れてください。':'未設定です。設定すると、プレイ時間の制限が有効になります。'}</p>
+   <div class="row"><input class="kin" id="pnew" type="password" inputmode="numeric" autocomplete="off" placeholder="数字4けた以上"><button class="btn" id="pset">設定する</button></div>
+   <p class="pmsg" id="psetMsg"></p>
+   <h3>プレイ時間</h3>
+   <div class="row"><label>1日の時間　<select id="plimit">${lim.map(v=>`<option value="${v}" ${PARENT.limit===v?'selected':''}>${v?v+'分':'制限なし'}</option>`).join('')}</select></label></div>
+   <p style="font-size:.85rem">今日のプレイ時間：${Math.floor(PLAY.sec/60)}分（延長 ${PLAY.extra}分）</p>
+   <p style="font-size:.78rem;color:var(--muted);margin:0">この制限とパスワードは、このブラウザの中だけのゆるいしくみです。ブラウザのデータを消すと解除できてしまいます。</p>
+   <h3>復習の間隔</h3>
+   <div class="row"><label>まちがえた記号を出すまで　<select id="preview">${rv.map(v=>`<option value="${v}" ${PARENT.review===v?'selected':''}>${v?v+'日後':'すぐ'}</option>`).join('')}</select></label></div>
+   <h3>進み具合</h3>
+   <table>
+    <tr><td>記号トレーニング</td><td>覚えた ${masteredN()}/${KE.length}（復習待ち ${waitList().length+dueList().length}）</td></tr>
+    <tr><td>記号の謎解き</td><td>${NZ.filter(z=>!z.bonus&&nSolved.has(z.s)).length}/${NZ.filter(z=>!z.bonus).length}</td></tr>
+    <tr><td>図鑑（ひみつの元素）</td><td>${unlocked.size}/${TOTAL_SECRET}</td></tr>
+    <tr><td>電子配置パズル</td><td>${cleared.size}/${PUZ.length}</td></tr>
+    <tr><td>合成（物質図鑑）</td><td>${nm}/${RECIPES.filter(r=>!r.bonus).length}</td></tr>
+    <tr><td>花火</td><td>${fCleared.size}/${STAGES.length}</td></tr>
+    <tr><td>半導体・LED</td><td>${sCleared.size}/${SSTAGES.length}</td></tr>
+   </table>
+   <h3>記録の書き出し・読み込み</h3>
+   <p class="bknote">記録はこのブラウザの中だけにあります。iPhoneでは、しばらく開かないと消えることがあります。ときどき書き出して、機種変更のときは新しい端末で読み込んでください。</p>
+   <div class="row"><button class="btn" id="bkSave">ファイルに保存</button><button class="btn" id="bkCopy">文字でコピー</button></div>
+   <p class="pmsg" id="bkMsg"></p>
+   <textarea class="bk" id="bkOut" readonly hidden aria-label="書き出した記録"></textarea>
+   <p class="bknote" style="margin-top:10px">読み込み：ファイルを選ぶか、コピーした文字を貼りつけます。いまの記録は上書きされます。</p>
+   <div class="row"><label class="btn" for="bkFile">ファイルを選ぶ</label><input type="file" id="bkFile" accept=".json,application/json,text/plain" hidden></div>
+   <textarea class="bk" id="bkIn" placeholder="ここに貼りつけ" aria-label="読み込む記録"></textarea>
+   <div class="row" style="margin-top:6px"><button class="btn" id="bkCheck">中身を確かめる</button></div>
+   <p class="pmsg" id="bkInMsg"></p>
+   <div class="row" id="bkApplyRow" hidden><button class="btn launch" id="bkApply">この記録で上書きする</button></div>
+   <h3>記録を消す</h3>
+   <div class="row"><button class="btn" id="preset">${resetArmed?'本当にすべて消す':'すべての記録を消す'}</button></div>`;
+  document.getElementById('pset').addEventListener('click',()=>{
+    const v=document.getElementById('pnew').value.trim();
+    if(!/^\d{4,}$/.test(v)){document.getElementById('psetMsg').textContent='数字4けた以上で入れてください。';return;}
+    PARENT.pw=v; saveParent(); parentAuthed=true; renderParent(); document.getElementById('psetMsg').style.color='#34A36A'; document.getElementById('psetMsg').textContent='設定しました。';
+  });
+  document.getElementById('plimit').addEventListener('change',ev=>{PARENT.limit=+ev.target.value;saveParent();renderParent();});
+  document.getElementById('preview').addEventListener('change',ev=>{PARENT.review=+ev.target.value;saveParent();});
+  const bkMsg=(t,warn)=>{const m=document.getElementById('bkMsg');m.textContent=t;m.style.color=warn?'':'#34A36A';};
+  document.getElementById('bkSave').addEventListener('click',()=>saveBackupFile(bkMsg));
+  document.getElementById('bkCopy').addEventListener('click',async()=>{
+    const ta=document.getElementById('bkOut'); ta.value=makeBackup(); ta.hidden=false; ta.focus(); ta.select();
+    try{await navigator.clipboard.writeText(ta.value); bkMsg('コピーしました。メモアプリなどに貼りつけて保存してください。');}
+    catch(_){ try{document.execCommand('copy')?bkMsg('コピーしました。メモアプリなどに貼りつけて保存してください。'):bkMsg('下の文字を長押しして、すべて選択→コピーしてください。');}catch(__){bkMsg('下の文字を長押しして、すべて選択→コピーしてください。');} }
+  });
+  const inMsg=(t,warn)=>{const m=document.getElementById('bkInMsg');m.textContent=t;m.style.color=warn?'':'#34A36A';};
+  const check=txt=>{
+    const r=parseBackup(txt); importData=null; document.getElementById('bkApplyRow').hidden=true;
+    if(r.err){inMsg(r.err,true);return;}
+    importData=r.data; const d=r.saved?new Date(r.saved):null;
+    inMsg(`${d&&!isNaN(d)?d.toLocaleString('ja-JP')+' に書き出した記録。':''}${r.summary}`);
+    document.getElementById('bkApplyRow').hidden=false;
+  };
+  document.getElementById('bkFile').addEventListener('change',ev=>{
+    const f=ev.target.files&&ev.target.files[0]; if(!f) return;
+    const rd=new FileReader(); rd.onload=()=>{document.getElementById('bkIn').value=rd.result; check(rd.result);}; rd.onerror=()=>inMsg('ファイルを読めませんでした。',true); rd.readAsText(f);
+  });
+  document.getElementById('bkCheck').addEventListener('click',()=>check(document.getElementById('bkIn').value));
+  document.getElementById('bkApply').addEventListener('click',()=>{
+    if(!importData) return;
+    BACKUP_KEYS.forEach(k=>{try{ if(k in importData) localStorage.setItem(k,importData[k]); else if(k!=='parent') localStorage.removeItem(k);}catch(_){}});
+    location.reload();
+  });
+  document.getElementById('preset').addEventListener('click',()=>{
+    if(!resetArmed){resetArmed=true;renderParent();return;}
+    PROGRESS_KEYS.forEach(k=>{try{localStorage.removeItem(k);}catch(_){}});
+    location.reload();
+  });
+}
+document.getElementById('openParent').addEventListener('click',openParent);
+try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist();}catch(_){}
+document.getElementById('parentClose').addEventListener('click',()=>{document.getElementById('parent').hidden=true;parentAuthed=false;resetArmed=false;});
+</script>
+</body>
+</html>
